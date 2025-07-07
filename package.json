@@ -1,0 +1,14 @@
+{
+  "name": "@stock-exchange-system/source",
+  "version": "0.0.0",
+  "license": "MIT",
+  "scripts": {},
+  "private": true,
+  "dependencies": {
+    "nest-next": "10.1.0"
+  },
+  "devDependencies": {
+    "@nx/workspace": "21.2.2",
+    "nx": "21.2.2"
+  }
+}
