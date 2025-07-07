@@ -1,0 +1,9 @@
+{
+  "name": "stock-fe",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/stock-fe",
+  "projectType": "application",
+  "tags": [],
+  "// targets": "to see all targets run: nx show project stock-fe --web",
+  "targets": {}
+}
