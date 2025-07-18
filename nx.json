@@ -14,7 +14,7 @@
     ],
     "sharedGlobals": []
   },
-  "nxCloudId": "686be09ebba3df1f3f43c796",
+  "nxCloudId": null,
   "plugins": [
     {
       "plugin": "@nx/webpack/plugin",
@@ -56,6 +56,20 @@
       "application": {
         "style": "tailwind",
         "linter": "eslint"
+      }
+    }
+  },
+  "tasksRunnerOptions": {
+    "default": {
+      "runner": "nx/tasks-runners/default",
+      "options": {
+        "cacheableOperations": [
+          "build",
+          "test"
+        ],
+        "useDaemonProcess": false,
+        "cacheDirectory": ".nx/cache",
+        "useRemoteCache": false
       }
     }
   }

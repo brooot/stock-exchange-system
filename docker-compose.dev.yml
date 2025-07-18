@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  # PostgreSQL 数据库服务
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_USER: ${DATABASE_USERNAME}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+      POSTGRES_DB: ${DATABASE_NAME}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test:
+        ['CMD-SHELL', 'pg_isready -U ${DATABASE_USERNAME} -d ${DATABASE_NAME}']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 后端开发服务
+  stock-back-end-dev:
+    build:
+      context: .
+      dockerfile: apps/stock-back-end/Dockerfile.dev
+    ports:
+      - '3001:3001'
+      - '9229:9229' # 调试端口
+    environment:
+      - NODE_ENV=development
+      - DATABASE_HOST=postgres # 对应上面的服务名
+      - DATABASE_PORT=5432
+      - DATABASE_USERNAME=${DATABASE_USERNAME}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
+      - DATABASE_NAME=${DATABASE_NAME}
+      - DATABASE_SYNC=true
+      - DATABASE_URL=postgresql://${DATABASE_USERNAME}:${DATABASE_PASSWORD}@postgres:5432/${DATABASE_NAME}?schema=public
+    volumes:
+      - .:/app # 挂载本地代码，实现热重载
+      - /app/node_modules # 避免覆盖容器内的 node_modules
+      - /app/.nx # 避免覆盖 Nx 缓存
+      - /app/dist # 避免覆盖构建产物
+    networks:
+      - app-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # tty: true
+    # stdin_open: true
+    # command: ["sh", "-c", "mkdir -p /app/dist/apps/stock-back-end && tail -f /dev/null"]
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+    driver: local

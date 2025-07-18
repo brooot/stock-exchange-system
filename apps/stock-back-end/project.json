@@ -9,7 +9,9 @@
       "executor": "nx:run-commands",
       "options": {
         "command": "webpack-cli build",
-        "args": ["--node-env=production"]
+        "args": [
+          "--node-env=production"
+        ]
       },
       "configurations": {
         "development": {
@@ -24,11 +26,15 @@
       "dependsOn": ["build"],
       "options": {
         "buildTarget": "stock-back-end:build",
-        "runBuildTargetDependencies": false
+        "runBuildTargetDependencies": false,
+        "args": [
+          "--inspect=0.0.0.0:9229"
+        ]
       },
       "configurations": {
         "development": {
-          "buildTarget": "stock-back-end:build:development"
+          "buildTarget": "stock-back-end:build:development",
+          "watch": true
         },
         "production": {
           "buildTarget": "stock-back-end:build:production"
@@ -39,6 +45,12 @@
       "options": {
         "passWithNoTests": true
       }
+    },
+    "docker-build": {
+      "dependsOn": [
+        "build"
+      ],
+      "command": "docker build -f apps/stock-back-end/Dockerfile.dev . -t stock-back-end"
     }
   }
 }
