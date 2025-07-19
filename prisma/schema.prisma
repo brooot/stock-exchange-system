@@ -10,26 +10,45 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// 交易类型枚举
 enum OrderType {
-  BUY
-  SELL
+  BUY   // 买入
+  SELL  // 卖出
 }
 
+// 订单方式枚举
 enum OrderMethod {
-  MARKET
-  LIMIT
+  MARKET  // 市价单
+  LIMIT   // 限价单
 }
 
-model Trade {
-  id          Int         @id @default(autoincrement())
-  userId      Int
-  symbol      String
-  price       Decimal
-  quantity    Int
-  type        OrderType
-  method      OrderMethod
-  createdAt   DateTime    @default(now())
-  isCompleted Boolean     @default(false)
+// 交易状态枚举
+enum TradeStatus {
+  PENDING    // 待处理
+  EXECUTED   // 已执行
+  CANCELLED  // 已取消
+}
 
+// 交易记录表
+model Trade {
+  id          Int         @id @default(autoincrement()) // 交易ID，主键
+  orderId     String      @unique @db.VarChar(20)       // 唯一订单号
+  userId      Int                                       // 用户ID
+  symbol      String      @db.VarChar(10)              // 股票代码，如AAPL
+  price       Decimal     @db.Decimal(10,2)            // 交易价格，保留2位小数
+  quantity    Int                                       // 交易数量（股数）
+  totalAmount Decimal     @db.Decimal(12,2)            // 交易总金额
+  type        OrderType                                 // 交易类型：买入/卖出
+  method      OrderMethod                               // 订单方式：市价/限价
+  status      TradeStatus @default(PENDING)             // 交易状态
+  createdAt   DateTime    @default(now())               // 创建时间
+  executedAt  DateTime?                                 // 实际执行时间
+  updatedAt   DateTime    @updatedAt                    // 更新时间
+
+  // 添加索引以提升查询性能
+  @@index([userId])
+  @@index([symbol])
+  @@index([createdAt])
+  @@index([status])
   @@map("trade")
 }
