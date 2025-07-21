@@ -7,7 +7,7 @@
 ### 文件说明
 
 - `.env.example` - 环境变量模板文件，包含所有必需的配置项
-- `.env` - 本地开发环境配置（不提交到版本控制）
+- `.env.development` - 开发环境配置（不提交到版本控制）
 - `.env.production` - 生产环境配置模板（不提交到版本控制）
 
 ### 数据库连接配置
@@ -31,14 +31,24 @@ DATABASE_URL="postgresql://postgres:1123@postgres:5432/stock_db?schema=public"
 DATABASE_URL="postgresql://postgres:your_password@postgres:5432/stock_db?schema=public"
 ```
 
+### 环境文件自动选择
+
+应用程序会根据 `NODE_ENV` 环境变量自动选择对应的环境文件：
+- 开发环境（`NODE_ENV=development` 或未设置）：使用 `.env.development`
+- 生产环境（`NODE_ENV=production`）：使用 `.env.production`
+
 ### 设置步骤
 
 1. **初始设置**：
    ```bash
-   cp .env.example .env
+   # 创建开发环境配置
+   cp .env.example .env.development
+   
+   # 创建生产环境配置
+   cp .env.example .env.production
    ```
 
-2. **编辑 .env 文件**，填入实际的数据库密码和其他配置
+2. **编辑对应的环境文件**，填入实际的数据库密码和其他配置
 
 3. **开发环境启动**：
    ```bash
@@ -53,11 +63,11 @@ DATABASE_URL="postgresql://postgres:your_password@postgres:5432/stock_db?schema=
 4. **生产环境部署**：
    ```bash
    # 复制并配置生产环境变量
-   cp .env.production .env
-   # 编辑 .env 文件，设置生产环境的安全密码
+   cp .env.example .env.production
+   # 编辑 .env.production 文件，设置生产环境的安全密码
    
    # 启动生产环境
-   docker-compose up -d
+   docker-compose -f docker-compose.prod.yml up -d
    ```
 
 ### 重要注意事项
@@ -72,7 +82,7 @@ DATABASE_URL="postgresql://postgres:your_password@postgres:5432/stock_db?schema=
 
 3. **安全性**：
    - 生产环境必须使用强密码
-   - 不要将包含敏感信息的 `.env` 文件提交到版本控制
+   - 不要将包含敏感信息的环境变量文件（`.env.development`、`.env.production` 等）提交到版本控制
    - 考虑使用密钥管理服务
 
 4. **Prisma 迁移**：

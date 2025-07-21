@@ -1,0 +1,47 @@
+### 用户注册
+POST http://localhost:3001/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "testuser",
+  "password": "123456"
+}
+
+### 用户登录
+POST http://localhost:3001/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "testuser",
+  "password": "123456"
+}
+
+### 获取账户信息
+GET http://localhost:3001/api/account
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InRlc3R1c2VyIiwic3ViIjoxLCJpYXQiOjE3NTI5MjU0NTMsImV4cCI6MTc1MzAxMTg1M30.27T_NfHwiocWadr-bImUC5PkIa6x85Zj823vcw2wMh0
+
+### 创建买单
+POST http://localhost:3001/api/orders
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InRlc3R1c2VyIiwic3ViIjoxLCJpYXQiOjE3NTI5MjU0NTMsImV4cCI6MTc1MzAxMTg1M30.27T_NfHwiocWadr-bImUC5PkIa6x85Zj823vcw2wMh0
+
+{
+  "type": "BUY",
+  "price": 150.00,
+  "quantity": 10
+}
+
+### 创建卖单
+POST http://localhost:3001/api/orders
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InRlc3R1c2VyIiwic3ViIjoxLCJpYXQiOjE3NTI5MjU0NTMsImV4cCI6MTc1MzAxMTg1M30.27T_NfHwiocWadr-bImUC5PkIa6x85Zj823vcw2wMh0
+
+{
+  "type": "SELL",
+  "price": 149.00,
+  "quantity": 5
+}
+
+### 取消订单
+DELETE http://localhost:3001/api/orders/ORDER_ID_HERE
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VybmFtZSI6InRlc3R1c2VyIiwic3ViIjoxLCJpYXQiOjE3NTI5MjU0NTMsImV4cCI6MTc1MzAxMTg1M30.27T_NfHwiocWadr-bImUC5PkIa6x85Zj823vcw2wMh0
