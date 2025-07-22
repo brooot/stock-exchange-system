@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserService } from '../user/user.service';
+import { PositionService } from '../position/position.service';
 import { OrderType, OrderStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
@@ -9,6 +10,7 @@ export class OrderService {
   constructor(
     private prisma: PrismaService,
     private userService: UserService,
+    private positionService: PositionService,
   ) {}
 
   async createOrder(
@@ -32,9 +34,9 @@ export class OrderService {
         throw new BadRequestException('余额不足');
       }
     } else {
-      // 检查持仓
-      const positions = await this.userService.getUserPositions(userId);
-      if (positions.quantity < quantity) {
+      // 检查持仓（假设交易AAPL股票）
+      const hasEnoughPosition = await this.positionService.checkSellQuantity(userId, 'AAPL', quantity);
+      if (!hasEnoughPosition) {
         throw new BadRequestException('持仓不足');
       }
     }
@@ -169,19 +171,34 @@ export class OrderService {
 
   private async updateUserBalances(buyOrder: any, sellOrder: any, price: number, quantity: number) {
     const tradeAmount = price * quantity;
+    const symbol = 'AAPL'; // 假设交易AAPL股票
 
-    // 买方：扣除资金
+    // 买方：扣除资金，增加持仓
     const buyer = await this.userService.findById(buyOrder.userId);
     await this.userService.updateBalance(
       buyOrder.userId,
       buyer.balance.toNumber() - tradeAmount
     );
+    await this.positionService.updatePositionOnTrade(
+      buyOrder.userId,
+      symbol,
+      'BUY',
+      quantity,
+      price
+    );
 
-    // 卖方：增加资金
+    // 卖方：增加资金，减少持仓
     const seller = await this.userService.findById(sellOrder.userId);
     await this.userService.updateBalance(
       sellOrder.userId,
       seller.balance.toNumber() + tradeAmount
+    );
+    await this.positionService.updatePositionOnTrade(
+      sellOrder.userId,
+      symbol,
+      'SELL',
+      quantity,
+      price
     );
   }
 }

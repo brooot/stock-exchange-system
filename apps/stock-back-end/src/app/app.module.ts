@@ -6,6 +6,7 @@ import { TradeModule } from './trade/trade.module';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
 import { OrderModule } from './order/order.module';
+import { PositionModule } from './position/position.module';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './prisma/prisma.module';
 
@@ -19,6 +20,7 @@ import { PrismaModule } from './prisma/prisma.module';
     AuthModule,
     UserModule,
     OrderModule,
+    PositionModule,
     TradeModule,
   ],
   controllers: [AppController],

@@ -38,17 +38,15 @@ export class UserService {
     const lastOrder = await this.prisma.order.findFirst({
       orderBy: { createdAt: 'desc' },
     });
-    const initialPrice = lastOrder ? lastOrder.price : 150.0;
+    const initialPrice = lastOrder ? lastOrder.price : 150.00;
 
-    // 为新用户初始化100股AAPL股票
-    await this.prisma.order.create({
+    // 为新用户初始化100股AAPL股票持仓
+    await this.prisma.position.create({
       data: {
         userId: user.id,
-        type: 'BUY',
-        price: initialPrice,
+        symbol: 'AAPL',
         quantity: 100,
-        filledQuantity: 100, // 直接设为已成交
-        status: 'FILLED',
+        avgPrice: initialPrice,
       },
     });
 
@@ -95,28 +93,50 @@ export class UserService {
     });
   }
 
-  // 获取用户持仓（通过订单计算）
+  // 获取用户持仓（直接从持仓表查询）
   async getUserPositions(userId: number) {
-    const orders = await this.prisma.order.findMany({
+    const positions = await this.prisma.position.findMany({
+      where: { userId },
+    });
+
+    return positions.map(position => ({
+      symbol: position.symbol,
+      quantity: position.quantity,
+      avgPrice: position.avgPrice,
+    }));
+  }
+
+  // 获取用户特定股票持仓
+  async getUserPosition(userId: number, symbol: string) {
+    return this.prisma.position.findUnique({
       where: {
-        userId,
-        status: { in: ['FILLED', 'PARTIALLY_FILLED'] },
+        userId_symbol: {
+          userId,
+          symbol,
+        },
       },
     });
+  }
 
-    // 计算AAPL持仓
-    let totalQuantity = 0;
-    orders.forEach(order => {
-      if (order.type === 'BUY') {
-        totalQuantity += order.filledQuantity;
-      } else {
-        totalQuantity -= order.filledQuantity;
-      }
+  // 更新用户持仓
+  async updateUserPosition(userId: number, symbol: string, quantity: number, avgPrice: number) {
+    return this.prisma.position.upsert({
+      where: {
+        userId_symbol: {
+          userId,
+          symbol,
+        },
+      },
+      update: {
+        quantity,
+        avgPrice,
+      },
+      create: {
+        userId,
+        symbol,
+        quantity,
+        avgPrice,
+      },
     });
-
-    return {
-      symbol: 'AAPL',
-      quantity: totalQuantity,
-    };
   }
 }
