@@ -2,14 +2,20 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { accountAPI, orderAPI, authAPI, tradeAPI } from '../../utils/api';
+import Decimal from 'decimal.js';
+import { accountAPI, orderAPI, authAPI, tradeAPI, positionAPI } from '../../utils/api';
 
 interface AccountInfo {
   balance: string;
-  positions: Array<{
-    symbol: string;
-    quantity: number;
-  }>;
+}
+
+interface Position {
+  id: string;
+  symbol: string;
+  quantity: number;
+  avgPrice: number;
+  currentValue?: number;
+  unrealizedPnL?: number;
 }
 
 interface MarketData {
@@ -31,6 +37,8 @@ interface OrderForm {
 
 export default function DashboardPage() {
   const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null);
+  const [positions, setPositions] = useState<Position[]>([]);
+  const [portfolioValue, setPortfolioValue] = useState<number>(0);
   const [marketData, setMarketData] = useState<MarketData | null>(null);
   const [orderForm, setOrderForm] = useState({
     type: 'BUY' as 'BUY' | 'SELL',
@@ -46,16 +54,25 @@ export default function DashboardPage() {
     // 由于token现在存储在httpOnly cookie中，我们无法直接检查
     // 让后端API调用来验证认证状态
     fetchAccountInfo();
+    fetchPositions();
     fetchMarketData();
 
     // 每5秒刷新市场数据
-    const interval = setInterval(fetchMarketData, 5000);
+    const interval = setInterval(() => {
+      fetchMarketData();
+    }, 5000);
     return () => clearInterval(interval);
   }, [router]);
+
+  // 当持仓更新时，重新计算投资组合价值
+  useEffect(() => {
+    calculatePortfolioValue();
+  }, [positions]);
 
   const fetchAccountInfo = async () => {
     try {
       const response = await accountAPI.getAccountInfo();
+      console.log('===> response.data: ', response.data);
       setAccountInfo(response.data);
     } catch (err: any) {
       if (err.response?.status === 401) {
@@ -64,6 +81,37 @@ export default function DashboardPage() {
       }
       setError('获取账户信息失败');
     }
+  };
+
+  const fetchPositions = async () => {
+    try {
+      const response = await positionAPI.getUserPositions();
+      setPositions(response.data);
+    } catch (err: any) {
+      if (err.response?.status === 401) {
+        return;
+      }
+      console.error('获取持仓信息失败:', err);
+    }
+  };
+
+  // 计算投资组合总价值
+  const calculatePortfolioValue = () => {
+    if (!positions.length) {
+      setPortfolioValue(0);
+      return;
+    }
+
+    let totalValue = new Decimal(0);
+    
+    positions.forEach((position) => {
+      // 目前使用平均成本价计算，后续可以集成实时价格API
+      const currentPrice = position.avgPrice;
+      const positionValue = new Decimal(position.quantity).mul(new Decimal(currentPrice));
+      totalValue = totalValue.add(positionValue);
+    });
+
+    setPortfolioValue(totalValue.toNumber());
   };
 
   const fetchMarketData = async () => {
@@ -90,8 +138,9 @@ export default function DashboardPage() {
 
       setSuccess('订单提交成功！');
       setOrderForm({ type: 'BUY', price: '', quantity: '' });
-      // 重新获取账户信息
+      // 重新获取账户信息和持仓信息
       fetchAccountInfo();
+      fetchPositions();
     } catch (err: any) {
       const errorMessage = err.response?.data?.message || '订单提交失败';
       setError(errorMessage);
@@ -119,29 +168,30 @@ export default function DashboardPage() {
           <div className="bg-white rounded-lg shadow p-6">
             <h2 className="text-lg font-medium text-gray-900 mb-4">账户信息</h2>
             {accountInfo ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-4">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">账户余额:</span>
+                    <span className="text-gray-600">现金余额:</span>
                     <span className="font-medium text-green-600">
                       ${accountInfo.balance}
                     </span>
                   </div>
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-gray-700 mb-2">持仓信息:</h3>
-                  {accountInfo.positions.length > 0 ? (
-                    <div className="space-y-2">
-                      {accountInfo.positions.map((position, index) => (
-                        <div key={index} className="flex justify-between text-sm">
-                          <span>{position.symbol}:</span>
-                          <span>{position.quantity} 股</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-gray-500 text-sm">暂无持仓</p>
-                  )}
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">投资组合价值:</span>
+                    <span className="font-medium text-blue-600">
+                      ${portfolioValue}
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">总资产:</span>
+                    <span className="font-medium text-purple-600">
+                      ${(parseFloat(accountInfo.balance) + portfolioValue).toFixed(2)}
+                    </span>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -149,6 +199,79 @@ export default function DashboardPage() {
                 <div className="h-4 bg-gray-200 rounded mb-2"></div>
                 <div className="h-4 bg-gray-200 rounded mb-2"></div>
                 <div className="h-4 bg-gray-200 rounded"></div>
+              </div>
+            )}
+          </div>
+
+          {/* 持仓信息 */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-medium text-gray-900 mb-4">持仓信息</h2>
+            {positions.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        股票代码
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        持仓数量
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        平均成本
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        当前价格
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        市值
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        未实现盈亏
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {positions.map((position) => {
+                      const currentPrice = marketData?.price || position.avgPrice;
+                      const currentValue = position.quantity * currentPrice;
+                      const unrealizedPnL = position.quantity * (currentPrice - position.avgPrice);
+                      const pnlPercent = ((currentPrice - position.avgPrice) / position.avgPrice) * 100;
+
+                      return (
+                        <tr key={position.id}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {position.symbol}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {position.quantity} 股
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            ${position.avgPrice}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            ${currentPrice}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            ${currentValue}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            <div className={`${unrealizedPnL >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              ${unrealizedPnL}
+                              <div className="text-xs">
+                                ({unrealizedPnL >= 0 ? '+' : ''}{pnlPercent}%)
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-gray-500">暂无持仓</p>
               </div>
             )}
           </div>

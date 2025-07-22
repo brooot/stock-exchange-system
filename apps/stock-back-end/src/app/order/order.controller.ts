@@ -22,25 +22,22 @@ class CreateOrderDto {
 export class OrderController {
   constructor(private readonly orderService: OrderService) {}
 
-  @Post()
+  @Post('create-order')
   async createOrder(
     @Body(ValidationPipe) createOrderDto: CreateOrderDto,
-    @Request() req,
+    @Request() req
   ) {
     const userId = req.user.userId;
     return this.orderService.createOrder(
       userId,
       createOrderDto.type,
       createOrderDto.price,
-      createOrderDto.quantity,
+      createOrderDto.quantity
     );
   }
 
   @Delete(':id')
-  async cancelOrder(
-    @Param('id') orderId: string,
-    @Request() req,
-  ) {
+  async cancelOrder(@Param('id') orderId: string, @Request() req) {
     const userId = req.user.userId;
     return this.orderService.cancelOrder(orderId, userId);
   }

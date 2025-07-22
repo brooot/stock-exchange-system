@@ -49,7 +49,7 @@ export const accountAPI = {
 export const orderAPI = {
   // 创建订单
   createOrder: (data: { type: string; price: number; quantity: number }) =>
-    api.post('/orders', data),
+    api.post('/orders/create-order', data),
 
   // 获取我的订单
   getMyOrders: () => api.get('/orders/my'),
@@ -70,6 +70,14 @@ export const tradeAPI = {
 
   // 获取市场数据
   getMarketData: () => api.get('/trades/market-data'),
+};
+
+export const positionAPI = {
+  // 获取用户所有持仓
+  getUserPositions: () => api.get('/positions'),
+
+  // 获取用户特定股票持仓
+  getUserPosition: (symbol: string) => api.get(`/positions/${symbol}`),
 };
 
 // 导出axios实例，以备特殊需求
