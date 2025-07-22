@@ -34,6 +34,24 @@ export class UserService {
       },
     });
 
+    // 获取最近一个订单的价格，如果没有则使用默认价格150
+    const lastOrder = await this.prisma.order.findFirst({
+      orderBy: { createdAt: 'desc' },
+    });
+    const initialPrice = lastOrder ? lastOrder.price : 150.0;
+
+    // 为新用户初始化100股AAPL股票
+    await this.prisma.order.create({
+      data: {
+        userId: user.id,
+        type: 'BUY',
+        price: initialPrice,
+        quantity: 100,
+        filledQuantity: 100, // 直接设为已成交
+        status: 'FILLED',
+      },
+    });
+
     return user;
   }
 

@@ -69,7 +69,7 @@ export const tradeAPI = {
   getTradeById: (id: string) => api.get(`/trades/${id}`),
 
   // 获取市场数据
-  getMarketData: () => api.get('/trades/market/data'),
+  getMarketData: () => api.get('/trades/market-data'),
 };
 
 // 导出axios实例，以备特殊需求

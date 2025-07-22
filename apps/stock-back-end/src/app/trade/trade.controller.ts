@@ -24,13 +24,13 @@ export class TradeController {
     return this.tradeService.getTradesByUser(userId);
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.tradeService.getTradeById(+id);
-  }
-
   @Get('market-data')
   async getMarketData() {
     return this.tradeService.getMarketData();
+  }
+
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.tradeService.getTradeById(+id);
   }
 }
