@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { tradeAPI } from '../../utils/api';
 
 interface MarketData {
   symbol: string;
@@ -39,13 +40,13 @@ export default function MarketPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
+    const hasLogin = localStorage.getItem('username');
+    if (!hasLogin) {
       router.push('/auth');
       return;
     }
     fetchMarketData();
-    
+
     // 每5秒刷新一次数据
     const interval = setInterval(fetchMarketData, 5000);
     return () => clearInterval(interval);
@@ -53,52 +54,48 @@ export default function MarketPage() {
 
   const fetchMarketData = async () => {
     try {
-      const token = localStorage.getItem('token');
-      
       // 获取最近交易记录
-      const tradesResponse = await fetch('http://localhost:3001/api/trades', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      const response = await tradeAPI.getMyTrades();
+      const tradesData = response.data;
+      console.log('===> tradesData: ', tradesData);
+      setRecentTrades(tradesData.slice(0, 10)); // 只显示最近10条
 
-      if (tradesResponse.ok) {
-        const tradesData = await tradesResponse.json();
-        setRecentTrades(tradesData.slice(0, 10)); // 只显示最近10条
-        
-        // 模拟市场数据（基于最近交易）
-        if (tradesData.length > 0) {
-          const latestTrade = tradesData[0];
-          const currentPrice = parseFloat(latestTrade.price);
-          
-          // 模拟市场数据
-          const mockMarketData: MarketData = {
-            symbol: 'AAPL',
-            price: currentPrice,
-            change: Math.random() * 10 - 5, // -5 到 +5 的随机变化
-            changePercent: (Math.random() * 10 - 5) / 100, // -5% 到 +5% 的随机变化
-            volume: Math.floor(Math.random() * 1000000) + 100000,
-            high: currentPrice + Math.random() * 5,
-            low: currentPrice - Math.random() * 5,
-            open: currentPrice + (Math.random() * 4 - 2),
-          };
-          
-          setMarketData(mockMarketData);
-        } else {
-          // 默认市场数据
-          setMarketData({
-            symbol: 'AAPL',
-            price: 150.00,
-            change: 0,
-            changePercent: 0,
-            volume: 0,
-            high: 150.00,
-            low: 150.00,
-            open: 150.00,
-          });
-        }
+      // 模拟市场数据（基于最近交易）
+      if (tradesData.length > 0) {
+        const latestTrade = tradesData[0];
+        const currentPrice = parseFloat(latestTrade.price);
+
+        // 模拟市场数据
+        const mockMarketData: MarketData = {
+          symbol: 'AAPL',
+          price: currentPrice,
+          change: Math.random() * 10 - 5, // -5 到 +5 的随机变化
+          changePercent: (Math.random() * 10 - 5) / 100, // -5% 到 +5% 的随机变化
+          volume: Math.floor(Math.random() * 1000000) + 100000,
+          high: currentPrice + Math.random() * 5,
+          low: currentPrice - Math.random() * 5,
+          open: currentPrice + (Math.random() * 4 - 2),
+        };
+
+        setMarketData(mockMarketData);
+      } else {
+        // 默认市场数据
+        setMarketData({
+          symbol: 'AAPL',
+          price: 150.00,
+          change: 0,
+          changePercent: 0,
+          volume: 0,
+          high: 150.00,
+          low: 150.00,
+          open: 150.00,
+        });
       }
-    } catch (err) {
+    } catch (err: any) {
+      if (err.response?.status === 401) {
+        // 401错误已在拦截器中处理，会自动跳转到登录页
+        return;
+      }
       setError('获取市场数据失败');
     } finally {
       setLoading(false);
@@ -177,7 +174,7 @@ export default function MarketPage() {
                       <div className={`text-sm font-medium ${
                         marketData.change >= 0 ? 'text-green-600' : 'text-red-600'
                       }`}>
-                        {marketData.change >= 0 ? '+' : ''}{marketData.change.toFixed(2)} 
+                          {marketData.change >= 0 ? '+' : ''}{marketData.change.toFixed(2)}
                         ({marketData.changePercent >= 0 ? '+' : ''}{(marketData.changePercent * 100).toFixed(2)}%)
                       </div>
                     </div>

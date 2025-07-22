@@ -20,21 +20,16 @@
       }
     },
     "serve": {
-      "continuous": true,
       "executor": "@nx/js:node",
       "defaultConfiguration": "development",
       "dependsOn": ["build"],
       "options": {
         "buildTarget": "stock-back-end:build",
-        "runBuildTargetDependencies": false,
-        "args": [
-          "--inspect=0.0.0.0:9229"
-        ]
+        "runBuildTargetDependencies": false
       },
       "configurations": {
         "development": {
-          "buildTarget": "stock-back-end:build:development",
-          "watch": true
+          "buildTarget": "stock-back-end:build:development"
         },
         "production": {
           "buildTarget": "stock-back-end:build:production"

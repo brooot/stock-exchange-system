@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { orderAPI, tradeAPI } from '../../utils/api';
 
 interface Order {
   id: string;
@@ -45,42 +46,25 @@ export default function HistoryPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      router.push('/auth');
-      return;
-    }
+    // 由于token现在存储在httpOnly cookie中，我们无法直接检查
+    // 让后端API调用来验证认证状态
     fetchData();
   }, [router]);
 
   const fetchData = async () => {
     try {
-      const token = localStorage.getItem('token');
-      
       // 获取订单历史
-      const ordersResponse = await fetch('http://localhost:3001/api/orders/my', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-      
+      const ordersResponse = await orderAPI.getMyOrders();
+      setOrders(ordersResponse.data);
+
       // 获取交易历史
-      const tradesResponse = await fetch('http://localhost:3001/api/trades/my', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (ordersResponse.ok) {
-        const ordersData = await ordersResponse.json();
-        setOrders(ordersData);
+      const tradesResponse = await tradeAPI.getMyTrades();
+      setTrades(tradesResponse.data);
+    } catch (err: any) {
+      if (err.response?.status === 401) {
+        // 401错误已在拦截器中处理，会自动跳转到登录页
+        return;
       }
-
-      if (tradesResponse.ok) {
-        const tradesData = await tradesResponse.json();
-        setTrades(tradesData);
-      }
-    } catch (err) {
       setError('获取数据失败');
     } finally {
       setLoading(false);

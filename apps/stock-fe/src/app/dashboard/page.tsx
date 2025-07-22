@@ -2,13 +2,25 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { accountAPI, orderAPI, authAPI, tradeAPI } from '../../utils/api';
 
 interface AccountInfo {
-  balance: number;
-  positions: {
+  balance: string;
+  positions: Array<{
     symbol: string;
     quantity: number;
-  }[];
+  }>;
+}
+
+interface MarketData {
+  symbol: string;
+  price: number;
+  change: number;
+  changePercent: number;
+  volume: number;
+  high: number;
+  low: number;
+  open: number;
 }
 
 interface OrderForm {
@@ -19,38 +31,47 @@ interface OrderForm {
 
 export default function DashboardPage() {
   const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null);
-  const [orderForm, setOrderForm] = useState<OrderForm>({ type: 'BUY', price: '', quantity: '' });
+  const [marketData, setMarketData] = useState<MarketData | null>(null);
+  const [orderForm, setOrderForm] = useState({
+    type: 'BUY' as 'BUY' | 'SELL',
+    price: '',
+    quantity: '',
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const router = useRouter();
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      router.push('/auth');
-      return;
-    }
+    // 由于token现在存储在httpOnly cookie中，我们无法直接检查
+    // 让后端API调用来验证认证状态
     fetchAccountInfo();
+    fetchMarketData();
+
+    // 每5秒刷新市场数据
+    const interval = setInterval(fetchMarketData, 5000);
+    return () => clearInterval(interval);
   }, [router]);
 
   const fetchAccountInfo = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/account', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setAccountInfo(data);
-      } else {
-        setError('获取账户信息失败');
+      const response = await accountAPI.getAccountInfo();
+      setAccountInfo(response.data);
+    } catch (err: any) {
+      if (err.response?.status === 401) {
+        // 401错误已在拦截器中处理，会自动跳转到登录页
+        return;
       }
-    } catch (err) {
-      setError('网络错误');
+      setError('获取账户信息失败');
+    }
+  };
+
+  const fetchMarketData = async () => {
+    try {
+      const response = await tradeAPI.getMarketData();
+      setMarketData(response.data);
+    } catch (err: any) {
+      console.error('获取市场数据失败:', err);
     }
   };
 
@@ -61,52 +82,44 @@ export default function DashboardPage() {
     setSuccess('');
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:3001/api/orders', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          type: orderForm.type,
-          price: parseFloat(orderForm.price),
-          quantity: parseInt(orderForm.quantity),
-        }),
+      await orderAPI.createOrder({
+        type: orderForm.type,
+        price: parseFloat(orderForm.price),
+        quantity: parseInt(orderForm.quantity),
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        setSuccess(`订单创建成功！订单ID: ${data.id}`);
-        setOrderForm({ type: 'BUY', price: '', quantity: '' });
-        fetchAccountInfo(); // 刷新账户信息
-      } else {
-        const errorData = await response.json();
-        setError(errorData.message || '订单创建失败');
-      }
-    } catch (err) {
-      setError('网络错误，请稍后重试');
+      setSuccess('订单提交成功！');
+      setOrderForm({ type: 'BUY', price: '', quantity: '' });
+      // 重新获取账户信息
+      fetchAccountInfo();
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || '订单提交失败';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('username');
-    router.push('/auth');
+  const handleLogout = async () => {
+    try {
+      await authAPI.logout();
+    } catch (err) {
+      console.error('退出登录失败:', err);
+    } finally {
+      localStorage.removeItem('username');
+      router.push('/auth');
+    }
   };
 
-  const username = localStorage.getItem('username');
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="space-y-6">
           {/* 账户信息 */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-medium text-gray-900 mb-4">账户信息</h2>
-              {accountInfo ? (
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-medium text-gray-900 mb-4">账户信息</h2>
+            {accountInfo ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <div className="flex justify-between">
                     <span className="text-gray-600">账户余额:</span>
@@ -114,34 +127,102 @@ export default function DashboardPage() {
                       ${accountInfo.balance}
                     </span>
                   </div>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-gray-700 mb-2">持仓信息:</h3>
+                  {accountInfo.positions.length > 0 ? (
+                    <div className="space-y-2">
+                      {accountInfo.positions.map((position, index) => (
+                        <div key={index} className="flex justify-between text-sm">
+                          <span>{position.symbol}:</span>
+                          <span>{position.quantity} 股</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 text-sm">暂无持仓</p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="animate-pulse">
+                <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                <div className="h-4 bg-gray-200 rounded"></div>
+              </div>
+            )}
+          </div>
+
+          {/* 市场行情 */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-lg font-medium text-gray-900 mb-4">市场行情</h2>
+            {marketData ? (
+              <div>
+                <div className="flex items-center justify-between mb-6">
                   <div>
-                    <h3 className="text-sm font-medium text-gray-700 mb-2">持仓信息:</h3>
-                    {accountInfo.positions.length > 0 ? (
-                      <div className="space-y-2">
-                        {accountInfo.positions.map((position, index) => (
-                          <div key={index} className="flex justify-between text-sm">
-                            <span>{position.symbol}:</span>
-                            <span>{position.quantity} 股</span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-gray-500 text-sm">暂无持仓</p>
-                    )}
+                    <h3 className="text-2xl font-bold text-gray-900">{marketData.symbol}</h3>
+                    <p className="text-gray-600">苹果公司</p>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-3xl font-bold text-gray-900">
+                      ${marketData.price.toFixed(2)}
+                    </div>
+                    <div className={`text-sm font-medium ${marketData.change >= 0 ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                      {marketData.change >= 0 ? '+' : ''}{marketData.change.toFixed(2)}
+                      ({marketData.changePercent >= 0 ? '+' : ''}{(marketData.changePercent * 100).toFixed(2)}%)
+                    </div>
                   </div>
                 </div>
-              ) : (
-                <div className="animate-pulse">
-                  <div className="h-4 bg-gray-200 rounded mb-2"></div>
-                  <div className="h-4 bg-gray-200 rounded mb-2"></div>
-                  <div className="h-4 bg-gray-200 rounded"></div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="text-center p-3 bg-gray-50 rounded">
+                    <div className="text-sm text-gray-600">开盘价</div>
+                    <div className="text-lg font-semibold">${marketData.open.toFixed(2)}</div>
+                  </div>
+                  <div className="text-center p-3 bg-gray-50 rounded">
+                    <div className="text-sm text-gray-600">最高价</div>
+                    <div className="text-lg font-semibold text-green-600">${marketData.high.toFixed(2)}</div>
+                  </div>
+                  <div className="text-center p-3 bg-gray-50 rounded">
+                    <div className="text-sm text-gray-600">最低价</div>
+                    <div className="text-lg font-semibold text-red-600">${marketData.low.toFixed(2)}</div>
+                  </div>
+                  <div className="text-center p-3 bg-gray-50 rounded">
+                    <div className="text-sm text-gray-600">成交量</div>
+                    <div className="text-lg font-semibold">{marketData.volume.toLocaleString()}</div>
+                  </div>
                 </div>
-              )}
-            </div>
+
+                <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-blue-600">市场状态</span>
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      <span className="w-2 h-2 bg-green-400 rounded-full mr-1 animate-pulse"></span>
+                      交易中
+                    </span>
+                  </div>
+                  <div className="text-xs text-blue-600 mt-1">
+                    数据每5秒自动更新
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="animate-pulse">
+                <div className="h-8 bg-gray-200 rounded mb-4"></div>
+                <div className="h-12 bg-gray-200 rounded mb-4"></div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="h-16 bg-gray-200 rounded"></div>
+                  <div className="h-16 bg-gray-200 rounded"></div>
+                  <div className="h-16 bg-gray-200 rounded"></div>
+                  <div className="h-16 bg-gray-200 rounded"></div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 交易面板 */}
-          <div className="lg:col-span-2">
+          <div>
             <div className="bg-white rounded-lg shadow p-6">
               <h2 className="text-lg font-medium text-gray-900 mb-4">交易面板</h2>
 

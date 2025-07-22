@@ -7,13 +7,9 @@ export default function Index() {
   const router = useRouter();
 
   useEffect(() => {
-    // 检查是否已登录
-    const token = localStorage.getItem('token');
-    if (token) {
-      router.push('/dashboard');
-    } else {
-      router.push('/auth');
-    }
+    // 由于token现在存储在httpOnly cookie中，我们无法直接检查
+    // 直接跳转到dashboard，让dashboard页面处理认证检查
+    router.push('/dashboard');
   }, [router]);
 
   return (

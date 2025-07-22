@@ -6,9 +6,13 @@
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app/app.module';
+import cookieParser from 'cookie-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  
+  // 配置 cookie-parser 中间件
+  app.use(cookieParser());
   
   // 配置 CORS
   app.enableCors({

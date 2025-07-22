@@ -1,6 +1,15 @@
-import { Controller, Post, Body, ValidationPipe } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  ValidationPipe,
+  Res,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { IsString, MinLength, MaxLength } from 'class-validator';
+import { Response } from 'express';
 
 class RegisterDto {
   @IsString()
@@ -27,11 +36,51 @@ export class AuthController {
 
   @Post('register')
   async register(@Body(ValidationPipe) registerDto: RegisterDto) {
-    return this.authService.register(registerDto.username, registerDto.password);
+    return this.authService.register(
+      registerDto.username,
+      registerDto.password
+    );
   }
 
   @Post('login')
-  async login(@Body(ValidationPipe) loginDto: LoginDto) {
-    return this.authService.login(loginDto.username, loginDto.password);
+  async login(
+    @Body(ValidationPipe) loginDto: LoginDto,
+    @Res({ passthrough: true }) response: Response
+  ) {
+    const result = await this.authService.login(
+      loginDto.username,
+      loginDto.password
+    );
+
+    // 设置httpOnly cookie
+    response.cookie('access_token', result.access_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production', // 生产环境使用HTTPS
+      sameSite: 'strict',
+      maxAge: 24 * 60 * 60 * 1000, // 24小时
+      path: '/',
+    });
+
+    // 返回成功信息，不包含token
+    return {
+      message: '登录成功',
+      username: loginDto.username,
+    };
+  }
+
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  async logout(@Res({ passthrough: true }) response: Response) {
+    // 清除cookie
+    response.clearCookie('access_token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/',
+    });
+
+    return {
+      message: '退出登录成功',
+    };
   }
 }

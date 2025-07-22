@@ -5,8 +5,8 @@ ENV PORT=3001
 
 WORKDIR /app
 
-# 安装pnpm和NX CLI
-RUN npm install -g pnpm nx
+# 安装pnpm、NX CLI和nodemon
+RUN npm install -g pnpm nx nodemon
 
 # 复制根目录依赖文件
 COPY package.json pnpm-lock.yaml nx.json ./
@@ -28,5 +28,5 @@ RUN npx prisma generate
 # 创建dist目录确保它存在
 RUN mkdir -p /app/dist/apps/stock-back-end
 
-# 启动NX开发服务器
-CMD ["nx", "serve", "stock-back-end", "--configuration=development"]
+# 使用nodemon监听文件变化并自动重启
+CMD ["nodemon", "--watch", "apps/stock-back-end/src", "--ext", "ts,js,json", "--exec", "nx build stock-back-end --configuration=development && node dist/apps/stock-back-end/main.js"]

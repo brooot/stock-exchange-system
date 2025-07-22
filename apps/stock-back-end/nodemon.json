@@ -1,0 +1,9 @@
+{
+  "watch": ["src"],
+  "ext": "ts,js,json",
+  "ignore": ["src/**/*.spec.ts"],
+  "exec": "nx build stock-back-end && node ../../dist/apps/stock-back-end/main.js",
+  "env": {
+    "NODE_ENV": "development"
+  }
+}

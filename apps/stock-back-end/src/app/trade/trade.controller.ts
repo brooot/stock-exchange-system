@@ -28,4 +28,14 @@ export class TradeController {
   findOne(@Param('id') id: string) {
     return this.tradeService.getTradeById(+id);
   }
+
+  @Get('market-data')
+  async getMarketData() {
+    console.log(
+      '🔥 热更新成功！API被调用 - 修改时间:',
+      new Date().toISOString()
+    );
+    console.log('🚀 nodemon热更新功能正常工作！');
+    return this.tradeService.getMarketData();
+  }
 }

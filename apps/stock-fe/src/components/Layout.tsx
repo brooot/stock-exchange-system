@@ -17,23 +17,27 @@ export default function Layout({ children }: LayoutProps) {
   const { toasts, removeToast, showSuccess } = useToast();
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const authenticated = !!token;
-    setIsAuthenticated(authenticated);
+    // 由于token现在存储在httpOnly cookie中，我们无法直接检查认证状态
+    // 对于需要认证的页面，让各个页面组件自己处理认证检查
+    setIsAuthenticated(true); // 假设已认证，让API调用来验证
     setLoading(false);
-
-    // 如果未认证且不在认证页面或主页，重定向到认证页面
-    if (!authenticated && pathname !== '/auth' && pathname !== '/') {
-      router.push('/auth');
-    }
   }, [pathname, router]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('username');
-    setIsAuthenticated(false);
-    showSuccess('已成功退出登录');
-    router.push('/auth');
+  const handleLogout = async () => {
+    try {
+      // 调用后端退出登录API来清除cookie
+      await fetch('http://localhost:3001/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch (err) {
+      console.error('退出登录失败:', err);
+    } finally {
+      localStorage.removeItem('username');
+      setIsAuthenticated(false);
+      showSuccess('已成功退出登录');
+      router.push('/auth');
+    }
   };
 
   const navigation = [
@@ -58,17 +62,7 @@ export default function Layout({ children }: LayoutProps) {
     return <>{children}</>;
   }
 
-  // 如果未认证且不在认证页面，显示加载状态
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">正在跳转到登录页面...</p>
-        </div>
-      </div>
-    );
-  }
+  // 移除认证检查，让各个页面组件自己处理
 
   return (
     <div className="min-h-screen bg-gray-50">

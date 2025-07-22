@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '../../hooks/useToast';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import { authAPI } from '../../utils/api';
 
 interface LoginForm {
   username: string;
@@ -31,25 +32,14 @@ export default function AuthPage() {
     setError('');
 
     try {
-      const response = await fetch('http://localhost:3001/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(loginForm),
-      });
-      console.log('===> response: ', response);
-      if (response.ok) {
-        const data = await response.json();
-        localStorage.setItem('token', data.access_token);
-        localStorage.setItem('username', loginForm.username);
-        router.push('/dashboard');
-      } else {
-        const errorData = await response.json();
-        setError(errorData.message || '登录失败');
-      }
-    } catch (err) {
-      setError('网络错误，请稍后重试');
+      const response = await authAPI.login(loginForm);
+      // token现在存储在httpOnly cookie中，不需要手动存储
+      localStorage.setItem('username', response.data.username);
+      showSuccess('登录成功！');
+      router.push('/dashboard');
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || '登录失败';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -67,28 +57,17 @@ export default function AuthPage() {
     }
 
     try {
-      const response = await fetch('http://localhost:3001/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username: registerForm.username,
-          password: registerForm.password,
-        }),
+      await authAPI.register({
+        username: registerForm.username,
+        password: registerForm.password,
       });
 
-      if (response.ok) {
-        setIsLogin(true);
-        setRegisterForm({ username: '', password: '', confirmPassword: '' });
-        setError('');
-        alert('注册成功，请登录');
-      } else {
-        const errorData = await response.json();
-        setError(errorData.message || '注册失败');
-      }
-    } catch (err) {
-      setError('网络错误，请稍后重试');
+      showSuccess('注册成功！请登录');
+      setIsLogin(true);
+      setRegisterForm({ username: '', password: '', confirmPassword: '' });
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || '注册失败';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
