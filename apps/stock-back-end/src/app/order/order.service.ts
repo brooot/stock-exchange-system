@@ -205,20 +205,57 @@ export class OrderService {
 
     // 如果有交易发生，广播市场数据更新
     if (filledQuantity > 0) {
-      //TODO 修改
-      // 获取最新的市场数据（这里使用模拟数据，实际应该从数据库或外部API获取）
+      // 获取最新成交价格（使用最后一次交易的价格）
+      const latestTrade = await this.prisma.trade.findFirst({
+        orderBy: { executedAt: 'desc' },
+        select: { price: true },
+      });
+
+      const latestPrice = latestTrade ? latestTrade.price.toNumber() : 150.0;
+
+      // 计算今日开盘价（简化实现，使用当日第一笔交易价格）
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
+      const firstTradeToday = await this.prisma.trade.findFirst({
+        where: {
+          executedAt: { gte: todayStart },
+        },
+        orderBy: { executedAt: 'asc' },
+        select: { price: true },
+      });
+
+      const openPrice = firstTradeToday
+        ? firstTradeToday.price.toNumber()
+        : latestPrice;
+      const change = latestPrice - openPrice;
+      const changePercent = openPrice > 0 ? change / openPrice : 0;
+
+      // 获取今日最高最低价
+      const todayPriceStats = await this.prisma.trade.aggregate({
+        where: {
+          executedAt: { gte: todayStart },
+        },
+        _max: { price: true },
+        _min: { price: true },
+        _sum: { quantity: true },
+      });
+
       const marketData = {
         symbol: 'AAPL',
-        price: 150.25,
-        change: 2.15,
-        changePercent: 0.0145,
-        open: 148.1,
-        high: 151.5,
-        low: 147.8,
-        volume: 1250000,
+        price: latestPrice,
+        change: change,
+        changePercent: changePercent,
+        open: openPrice,
+        high: todayPriceStats._max.price
+          ? todayPriceStats._max.price.toNumber()
+          : latestPrice,
+        low: todayPriceStats._min.price
+          ? todayPriceStats._min.price.toNumber()
+          : latestPrice,
+        volume: todayPriceStats._sum.quantity || 0,
         timestamp: new Date(),
       };
-
       this.marketGateway.broadcastMarketUpdate(marketData);
     }
 

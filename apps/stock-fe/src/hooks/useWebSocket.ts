@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { tradeAPI } from '../utils/api';
 
 interface MarketData {
   symbol: string;
@@ -27,11 +28,27 @@ export const useWebSocket = () => {
   const [isConnected, setIsConnected] = useState(false);
   const socketRef = useRef<Socket | null>(null);
 
+  // 获取初始市场数据
+  const fetchInitialMarketData = async () => {
+    try {
+      const response = await tradeAPI.getMarketData();
+      setMarketData(response.data);
+    } catch (err: any) {
+      console.error('获取市场数据失败:', err);
+    }
+  };
+
   useEffect(() => {
+    // 获取初始市场数据
+    fetchInitialMarketData();
+    console.log('===> process.env: ', process.env.NEXT_PUBLIC_BACKEND_HOST, process.env.NEXT_PUBLIC_BACKEND_PORT);
     // 连接到WebSocket服务器
-    const socket = io('http://localhost:3001/market', {
-      withCredentials: true,
-    });
+    const socket = io(
+      `http://${process.env.NEXT_PUBLIC_BACKEND_HOST}:${process.env.NEXT_PUBLIC_BACKEND_PORT}/market`,
+      {
+        withCredentials: true,
+      }
+    );
 
     socketRef.current = socket;
 

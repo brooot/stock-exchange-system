@@ -38,8 +38,7 @@ interface OrderForm {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { marketData: socketMarketData, lastTrade, isConnected } = useWebSocket();
-  const [marketData, setMarketData] = useState<MarketData | null>(socketMarketData);
+  const { marketData, lastTrade, isConnected } = useWebSocket();
 
   const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null);
   const [positions, setPositions] = useState<Position[]>([]);
@@ -58,7 +57,6 @@ export default function DashboardPage() {
     // 让后端API调用来验证认证状态
     fetchAccountInfo();
     fetchPositions();
-    fetchMarketData();
   }, [router]);
 
   // 当持仓更新时，重新计算投资组合价值
@@ -111,14 +109,7 @@ export default function DashboardPage() {
     setPortfolioValue(totalValue.toNumber());
   };
 
-  const fetchMarketData = async () => {
-    try {
-      const response = await tradeAPI.getMarketData();
-      setMarketData(response.data);
-    } catch (err: any) {
-      console.error('获取市场数据失败:', err);
-    }
-  };
+
 
   const handleOrder = async (e: React.FormEvent) => {
     e.preventDefault();
