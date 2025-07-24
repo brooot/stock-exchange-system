@@ -1,7 +1,13 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserService } from '../user/user.service';
 import { PositionService } from '../position/position.service';
+import { MarketGateway } from '../websocket/market.gateway';
 import { OrderType, OrderStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
@@ -10,7 +16,8 @@ export class OrderService {
   constructor(
     private prisma: PrismaService,
     private userService: UserService,
-    private positionService: PositionService
+    private positionService: PositionService,
+    private marketGateway: MarketGateway
   ) {}
 
   /** 创建订单 */
@@ -129,7 +136,7 @@ export class OrderService {
       const tradePrice = oppositeOrder.price; // 使用对手盘价格
 
       // 创建交易记录
-      await this.prisma.trade.create({
+      const trade = await this.prisma.trade.create({
         data: {
           buyOrderId: newOrder.type === 'BUY' ? newOrder.id : oppositeOrder.id,
           sellOrderId:
@@ -137,6 +144,15 @@ export class OrderService {
           price: tradePrice,
           quantity: tradeQuantity,
         },
+      });
+
+      // 广播交易完成事件
+      this.marketGateway.broadcastTradeCompleted({
+        symbol: 'AAPL',
+        price: tradePrice.toNumber(),
+        quantity: tradeQuantity,
+        timestamp: new Date(),
+        tradeId: trade.id,
       });
 
       // 更新订单状态
@@ -186,6 +202,25 @@ export class OrderService {
         : filledQuantity > 0
         ? 'PARTIALLY_FILLED'
         : 'OPEN';
+
+    // 如果有交易发生，广播市场数据更新
+    if (filledQuantity > 0) {
+      //TODO 修改
+      // 获取最新的市场数据（这里使用模拟数据，实际应该从数据库或外部API获取）
+      const marketData = {
+        symbol: 'AAPL',
+        price: 150.25,
+        change: 2.15,
+        changePercent: 0.0145,
+        open: 148.1,
+        high: 151.5,
+        low: 147.8,
+        volume: 1250000,
+        timestamp: new Date(),
+      };
+
+      this.marketGateway.broadcastMarketUpdate(marketData);
+    }
 
     return {
       filledQuantity,

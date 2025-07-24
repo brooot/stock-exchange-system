@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Decimal from 'decimal.js';
 import { accountAPI, orderAPI, authAPI, tradeAPI, positionAPI } from '../../utils/api';
+import { useWebSocket } from '../../hooks/useWebSocket';
 
 interface AccountInfo {
   balance: string;
@@ -36,10 +37,13 @@ interface OrderForm {
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const { marketData: socketMarketData, lastTrade, isConnected } = useWebSocket();
+  const [marketData, setMarketData] = useState<MarketData | null>(socketMarketData);
+
   const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null);
   const [positions, setPositions] = useState<Position[]>([]);
   const [portfolioValue, setPortfolioValue] = useState<number>(0);
-  const [marketData, setMarketData] = useState<MarketData | null>(null);
   const [orderForm, setOrderForm] = useState({
     type: 'BUY' as 'BUY' | 'SELL',
     price: '',
@@ -48,7 +52,6 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const router = useRouter();
 
   useEffect(() => {
     // 由于token现在存储在httpOnly cookie中，我们无法直接检查
@@ -56,12 +59,6 @@ export default function DashboardPage() {
     fetchAccountInfo();
     fetchPositions();
     fetchMarketData();
-
-    // 每5秒刷新市场数据
-    const interval = setInterval(() => {
-      fetchMarketData();
-    }, 5000);
-    return () => clearInterval(interval);
   }, [router]);
 
   // 当持仓更新时，重新计算投资组合价值
@@ -103,7 +100,7 @@ export default function DashboardPage() {
     }
 
     let totalValue = new Decimal(0);
-    
+
     positions.forEach((position) => {
       // 目前使用平均成本价计算，后续可以集成实时价格API
       const currentPrice = position.avgPrice;
@@ -253,13 +250,13 @@ export default function DashboardPage() {
                             ${currentPrice}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            ${currentValue}
+                            ${currentValue.toFixed(2)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
                             <div className={`${unrealizedPnL >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                              ${unrealizedPnL}
+                              ${unrealizedPnL.toFixed(2)}
                               <div className="text-xs">
-                                ({unrealizedPnL >= 0 ? '+' : ''}{pnlPercent}%)
+                                ({unrealizedPnL >= 0 ? '+' : ''}{pnlPercent.toFixed(2)}%)
                               </div>
                             </div>
                           </td>
@@ -319,15 +316,26 @@ export default function DashboardPage() {
 
                 <div className="mt-4 p-4 bg-blue-50 rounded-lg">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-blue-600">市场状态</span>
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                      <span className="w-2 h-2 bg-green-400 rounded-full mr-1 animate-pulse"></span>
-                      交易中
+                    <span className="text-sm text-blue-600">连接状态</span>
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${isConnected
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-red-100 text-red-800'
+                      }`}>
+                      <span className={`w-2 h-2 rounded-full mr-1 ${isConnected
+                        ? 'bg-green-400 animate-pulse'
+                        : 'bg-red-400'
+                        }`}></span>
+                      {isConnected ? 'WebSocket已连接' : 'WebSocket断开'}
                     </span>
                   </div>
                   <div className="text-xs text-blue-600 mt-1">
-                    数据每5秒自动更新
+                    {isConnected ? '实时数据推送' : '等待连接...'}
                   </div>
+                  {lastTrade && (
+                    <div className="text-xs text-green-600 mt-2">
+                      最新交易: ${lastTrade.price.toFixed(2)} × {lastTrade.quantity}
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
