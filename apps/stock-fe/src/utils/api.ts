@@ -48,7 +48,7 @@ export const accountAPI = {
 
 export const orderAPI = {
   // 创建订单
-  createOrder: (data: { type: string; price: number; quantity: number }) =>
+  createOrder: (data: { type: string; method?: string; price: number; quantity: number }) =>
     api.post('/orders/create-order', data),
 
   // 获取我的订单
@@ -78,6 +78,17 @@ export const positionAPI = {
 
   // 获取用户特定股票持仓
   getUserPosition: (symbol: string) => api.get(`/positions/${symbol}`),
+};
+
+export const botAPI = {
+  // 启动机器人交易
+  startBotTrading: () => api.post('/bot/start'),
+
+  // 停止机器人交易
+  stopBotTrading: () => api.post('/bot/stop'),
+
+  // 获取机器人状态
+  getBotStatus: () => api.get('/bot/status'),
 };
 
 // 导出axios实例，以备特殊需求

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Decimal from 'decimal.js';
 import { accountAPI, orderAPI, authAPI, tradeAPI, positionAPI } from '../../utils/api';
 import { useWebSocket } from '../../hooks/useWebSocket';
-import { AccountInfo, PositionTable, MarketData, TradingPanel } from '../../components/dashboard';
+import { AccountInfo, PositionTable, MarketData, TradingPanel, BotControl } from '../../components/dashboard';
 
 interface AccountInfo {
   balance: string;
@@ -130,11 +130,15 @@ export default function DashboardPage() {
             marketData={marketData}
           />
           
-          <MarketData 
-            marketData={marketData}
-            isConnected={isConnected}
-            lastTrade={lastTrade}
-          />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <MarketData 
+              marketData={marketData}
+              isConnected={isConnected}
+              lastTrade={lastTrade}
+            />
+            
+            <BotControl />
+          </div>
           
           <TradingPanel 
              marketData={marketData}

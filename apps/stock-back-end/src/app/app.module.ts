@@ -10,6 +10,7 @@ import { PositionModule } from './position/position.module';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './prisma/prisma.module';
 import { WebsocketModule } from './websocket/websocket.module';
+import { BotModule } from './bot/bot.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { WebsocketModule } from './websocket/websocket.module';
     PositionModule,
     TradeModule,
     WebsocketModule,
+    BotModule,
   ],
   controllers: [AppController],
   providers: [

@@ -1,12 +1,16 @@
 import { Controller, Post, Delete, Get, Body, Param, UseGuards, Request, ValidationPipe } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OrderService } from './order.service';
-import { OrderType } from '@prisma/client';
-import { IsEnum, IsNumber, IsPositive } from 'class-validator';
+import { OrderType, OrderMethod } from '@prisma/client';
+import { IsEnum, IsNumber, IsPositive, IsOptional } from 'class-validator';
 
 class CreateOrderDto {
   @IsEnum(OrderType, { message: '订单类型必须是BUY或SELL' })
   type: OrderType;
+
+  @IsOptional()
+  @IsEnum(OrderMethod, { message: '订单方式必须是MARKET或LIMIT' })
+  method?: OrderMethod;
 
   @IsNumber({}, { message: '价格必须是数字' })
   @IsPositive({ message: '价格必须大于0' })
@@ -31,6 +35,7 @@ export class OrderController {
     return this.orderService.createOrder(
       userId,
       createOrderDto.type,
+      createOrderDto.method || OrderMethod.LIMIT,
       createOrderDto.price,
       createOrderDto.quantity
     );

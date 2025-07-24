@@ -16,6 +16,12 @@ enum OrderType {
   SELL  // 卖出
 }
 
+// 订单方式枚举
+enum OrderMethod {
+  MARKET // 市价单
+  LIMIT  // 限价单
+}
+
 // 订单状态枚举
 enum OrderStatus {
   OPEN             // 开放
@@ -45,6 +51,7 @@ model Order {
   id              String      @id @default(uuid())
   userId          Int
   type            OrderType   // BUY, SELL
+  method          OrderMethod @default(LIMIT) // MARKET, LIMIT
   price           Decimal     @db.Decimal(16,2)
   quantity        Int         // 原始订单数量
   filledQuantity  Int         @default(0) // 已成交数量

@@ -8,7 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UserService } from '../user/user.service';
 import { PositionService } from '../position/position.service';
 import { MarketGateway } from '../websocket/market.gateway';
-import { OrderType, OrderStatus } from '@prisma/client';
+import { OrderType, OrderStatus, OrderMethod } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
 @Injectable()
@@ -24,6 +24,7 @@ export class OrderService {
   async createOrder(
     userId: number,
     type: OrderType,
+    method: OrderMethod,
     price: number,
     quantity: number
   ) {
@@ -58,6 +59,7 @@ export class OrderService {
       data: {
         userId,
         type,
+        method,
         price: new Decimal(price),
         quantity,
         status: 'OPEN',
@@ -110,14 +112,22 @@ export class OrderService {
     let remainingQuantity = newOrder.quantity;
 
     // 查找对手盘订单
+    const whereCondition: any = {
+      type: oppositeType,
+      status: { in: ['OPEN', 'PARTIALLY_FILLED'] },
+    };
+
+    // 市价单忽略价格限制，限价单需要价格匹配
+    if (newOrder.method === OrderMethod.LIMIT) {
+      if (newOrder.type === OrderType.BUY) {
+        whereCondition.price = { lte: newOrder.price }; // 买单匹配价格小于等于的卖单
+      } else {
+        whereCondition.price = { gte: newOrder.price }; // 卖单匹配价格大于等于的买单
+      }
+    }
+
     const oppositeOrders = await this.prisma.order.findMany({
-      where: {
-        type: oppositeType,
-        status: { in: ['OPEN', 'PARTIALLY_FILLED'] },
-        ...(newOrder.type === OrderType.BUY
-          ? { price: { lte: newOrder.price } } // 买单匹配价格小于等于的卖单
-          : { price: { gte: newOrder.price } }), // 卖单匹配价格大于等于的买单
-      },
+      where: whereCondition,
       orderBy: [
         { price: newOrder.type === OrderType.BUY ? 'asc' : 'desc' }, // 价格优先
         { createdAt: 'asc' }, // 时间优先
@@ -133,7 +143,25 @@ export class OrderService {
       if (availableQuantity <= 0) continue;
 
       const tradeQuantity = Math.min(remainingQuantity, availableQuantity);
-      const tradePrice = oppositeOrder.price; // 使用对手盘价格
+
+      // 计算成交价格
+      let tradePrice: number;
+      if (newOrder.method === OrderMethod.MARKET) {
+        // 市价单直接使用对手盘价格成交
+        tradePrice = oppositeOrder.price.toNumber();
+      } else {
+        // 限价单取买卖价格的平均数作为成交价
+        const buyPrice =
+          newOrder.type === 'BUY'
+            ? newOrder.price.toNumber()
+            : oppositeOrder.price.toNumber();
+        const sellPrice =
+          newOrder.type === 'BUY'
+            ? oppositeOrder.price.toNumber()
+            : newOrder.price.toNumber();
+        tradePrice = Math.round(((buyPrice + sellPrice) / 2) * 100) / 100;
+      }
+      tradePrice = Math.round(tradePrice * 100) / 100; // 保留2位小数
 
       // 创建交易记录
       const trade = await this.prisma.trade.create({
@@ -149,7 +177,7 @@ export class OrderService {
       // 广播交易完成事件
       this.marketGateway.broadcastTradeCompleted({
         symbol: 'AAPL',
-        price: tradePrice.toNumber(),
+        price: tradePrice,
         quantity: tradeQuantity,
         timestamp: new Date(),
         tradeId: trade.id,
@@ -188,7 +216,7 @@ export class OrderService {
       await this.updateUserBalances(
         newOrder,
         oppositeOrder,
-        tradePrice.toNumber(),
+        tradePrice,
         tradeQuantity
       );
 

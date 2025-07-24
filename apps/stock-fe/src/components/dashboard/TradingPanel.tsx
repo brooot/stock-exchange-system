@@ -18,6 +18,7 @@ interface TradingPanelProps {
   onCreateOrder: (orderData: {
     symbol: string;
     type: 'BUY' | 'SELL';
+    method?: 'MARKET' | 'LIMIT';
     quantity: number;
     price: number;
   }) => Promise<void>;
@@ -34,6 +35,7 @@ export default function TradingPanel({
   success 
 }: TradingPanelProps) {
   const [orderType, setOrderType] = useState<'BUY' | 'SELL'>('BUY');
+  const [orderMethod, setOrderMethod] = useState<'MARKET' | 'LIMIT'>('LIMIT');
   const [quantity, setQuantity] = useState('');
   const [price, setPrice] = useState('');
 
@@ -41,20 +43,32 @@ export default function TradingPanel({
     e.preventDefault();
     if (!marketData) return;
 
+    const orderPrice = orderMethod === 'MARKET' ? marketData.price : parseFloat(price);
+
     await onCreateOrder({
       symbol: marketData.symbol,
       type: orderType,
+      method: orderMethod,
       quantity: parseInt(quantity),
-      price: parseFloat(price)
+      price: orderPrice
     });
 
     // 清空表单
     setQuantity('');
-    setPrice('');
+    if (orderMethod === 'LIMIT') {
+      setPrice('');
+    }
   };
 
-  const estimatedTotal = quantity && price ? 
-    (parseInt(quantity) * parseFloat(price)).toFixed(2) : '0.00';
+  const getEstimatedPrice = () => {
+    if (orderMethod === 'MARKET' && marketData) {
+      return marketData.price;
+    }
+    return price ? parseFloat(price) : 0;
+  };
+
+  const estimatedTotal = quantity && getEstimatedPrice() ? 
+    (parseInt(quantity) * getEstimatedPrice()).toFixed(2) : '0.00';
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
@@ -88,6 +102,37 @@ export default function TradingPanel({
             </button>
           </div>
 
+          {/* 订单方式选择 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              订单方式
+            </label>
+            <div className="flex space-x-2">
+              <button
+                type="button"
+                onClick={() => setOrderMethod('LIMIT')}
+                className={`flex-1 py-2 px-4 rounded-md font-medium text-sm ${
+                  orderMethod === 'LIMIT'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                限价单
+              </button>
+              <button
+                type="button"
+                onClick={() => setOrderMethod('MARKET')}
+                className={`flex-1 py-2 px-4 rounded-md font-medium text-sm ${
+                  orderMethod === 'MARKET'
+                    ? 'bg-orange-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                市价单
+              </button>
+            </div>
+          </div>
+
           {/* 股票信息 */}
           <div className="bg-gray-50 p-3 rounded-md">
             <div className="flex justify-between items-center">
@@ -113,30 +158,41 @@ export default function TradingPanel({
           </div>
 
           {/* 价格输入 */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              价格 ($)
-            </label>
-            <div className="flex space-x-2">
-              <input
-                type="number"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="请输入价格"
-                step="0.01"
-                min="0.01"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setPrice(marketData.price.toString())}
-                className="px-3 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
-              >
-                市价
-              </button>
+          {orderMethod === 'LIMIT' ? (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                限价 ($)
+              </label>
+              <div className="flex space-x-2">
+                <input
+                  type="number"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="请输入限价"
+                  step="0.01"
+                  min="0.01"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setPrice(marketData.price.toString())}
+                  className="px-3 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-sm"
+                >
+                  当前价
+                </button>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                市价 ($)
+              </label>
+              <div className="bg-gray-50 px-3 py-2 border border-gray-300 rounded-md">
+                <span className="text-gray-600">将以当前市价 ${marketData.price.toFixed(2)} 成交</span>
+              </div>
+            </div>
+          )}
 
           {/* 预估总额 */}
           <div className="bg-blue-50 p-3 rounded-md">
@@ -162,14 +218,14 @@ export default function TradingPanel({
           {/* 提交按钮 */}
           <button
             type="submit"
-            disabled={isLoading || !quantity || !price}
+            disabled={isLoading || !quantity || (orderMethod === 'LIMIT' && !price)}
             className={`w-full py-2 px-4 rounded-md font-medium ${
               orderType === 'BUY'
                 ? 'bg-green-600 hover:bg-green-700 text-white'
                 : 'bg-red-600 hover:bg-red-700 text-white'
             } disabled:opacity-50 disabled:cursor-not-allowed`}
           >
-            {isLoading ? '处理中...' : `${orderType === 'BUY' ? '买入' : '卖出'} ${marketData.symbol}`}
+            {isLoading ? '处理中...' : `${orderMethod === 'MARKET' ? '市价' : '限价'}${orderType === 'BUY' ? '买入' : '卖出'} ${marketData.symbol}`}
           </button>
         </form>
       )}
