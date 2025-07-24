@@ -122,15 +122,6 @@ export default function HistoryPage() {
               </button>
               <h1 className="text-xl font-bold text-gray-900">交易历史</h1>
             </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-gray-700">欢迎, {username}</span>
-              <button
-                onClick={() => router.push('/market')}
-                className="text-blue-600 hover:text-blue-800"
-              >
-                实时行情
-              </button>
-            </div>
           </div>
         </div>
       </nav>

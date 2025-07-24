@@ -32,7 +32,7 @@ export class OrderService {
       throw new BadRequestException('价格和数量必须大于0');
     }
 
-    // 获取用户信息
+  // 获取用户信息
     const user = await this.userService.findById(userId);
 
     // 检查资金/持仓
@@ -302,5 +302,27 @@ export class OrderService {
       quantity,
       price
     );
+  }
+
+  /** 获取用户的订单列表 */
+  async getUserOrders(userId: number) {
+    const orders = await this.prisma.order.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        type: true,
+        price: true,
+        quantity: true,
+        filledQuantity: true,
+        status: true,
+        createdAt: true,
+      },
+    });
+
+    return orders.map(order => ({
+      ...order,
+      price: order.price.toNumber(),
+    }));
   }
 }

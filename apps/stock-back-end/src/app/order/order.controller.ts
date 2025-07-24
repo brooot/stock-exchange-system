@@ -1,4 +1,4 @@
-import { Controller, Post, Delete, Body, Param, UseGuards, Request, ValidationPipe } from '@nestjs/common';
+import { Controller, Post, Delete, Get, Body, Param, UseGuards, Request, ValidationPipe } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OrderService } from './order.service';
 import { OrderType } from '@prisma/client';
@@ -34,6 +34,12 @@ export class OrderController {
       createOrderDto.price,
       createOrderDto.quantity
     );
+  }
+
+  @Get('my')
+  async getMyOrders(@Request() req) {
+    const userId = req.user.userId;
+    return this.orderService.getUserOrders(userId);
   }
 
   @Delete(':id')

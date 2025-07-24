@@ -21,6 +21,12 @@ export default function Layout({ children }: LayoutProps) {
     // 对于需要认证的页面，让各个页面组件自己处理认证检查
     setIsAuthenticated(true); // 假设已认证，让API调用来验证
     setLoading(false);
+
+    // 兜底跳转逻辑：如果访问的不是已知页面，跳转到dashboard
+    const knownPaths = ['/auth', '/', '/dashboard', '/history'];
+    if (!knownPaths.includes(pathname)) {
+      router.push('/dashboard');
+    }
   }, [pathname, router]);
 
   const handleLogout = async () => {
@@ -43,7 +49,6 @@ export default function Layout({ children }: LayoutProps) {
   const navigation = [
     { name: '仪表板', href: '/dashboard', icon: '📊' },
     { name: '交易历史', href: '/history', icon: '📈' },
-    { name: '实时行情', href: '/market', icon: '💹' },
   ];
 
   if (loading) {
@@ -79,11 +84,10 @@ export default function Layout({ children }: LayoutProps) {
                 <button
                   key={item.name}
                   onClick={() => router.push(item.href)}
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    pathname === item.href
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                  }`}
+                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${pathname === item.href
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                    }`}
                 >
                   <span className="mr-2">{item.icon}</span>
                   {item.name}

@@ -1,0 +1,178 @@
+'use client';
+
+import React, { useState } from 'react';
+
+interface MarketData {
+  symbol: string;
+  price: number;
+  change: number;
+  changePercent: number;
+  volume: number;
+  high: number;
+  low: number;
+  open: number;
+}
+
+interface TradingPanelProps {
+  marketData: MarketData | null;
+  onCreateOrder: (orderData: {
+    symbol: string;
+    type: 'BUY' | 'SELL';
+    quantity: number;
+    price: number;
+  }) => Promise<void>;
+  isLoading: boolean;
+  error: string | null;
+  success: string | null;
+}
+
+export default function TradingPanel({ 
+  marketData, 
+  onCreateOrder, 
+  isLoading, 
+  error, 
+  success 
+}: TradingPanelProps) {
+  const [orderType, setOrderType] = useState<'BUY' | 'SELL'>('BUY');
+  const [quantity, setQuantity] = useState('');
+  const [price, setPrice] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!marketData) return;
+
+    await onCreateOrder({
+      symbol: marketData.symbol,
+      type: orderType,
+      quantity: parseInt(quantity),
+      price: parseFloat(price)
+    });
+
+    // 清空表单
+    setQuantity('');
+    setPrice('');
+  };
+
+  const estimatedTotal = quantity && price ? 
+    (parseInt(quantity) * parseFloat(price)).toFixed(2) : '0.00';
+
+  return (
+    <div className="bg-white rounded-lg shadow p-6">
+      <h2 className="text-lg font-medium text-gray-900 mb-4">交易面板</h2>
+      
+      {marketData && (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* 买卖选择 */}
+          <div className="flex space-x-2">
+            <button
+              type="button"
+              onClick={() => setOrderType('BUY')}
+              className={`flex-1 py-2 px-4 rounded-md font-medium ${
+                orderType === 'BUY'
+                  ? 'bg-green-600 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              买入
+            </button>
+            <button
+              type="button"
+              onClick={() => setOrderType('SELL')}
+              className={`flex-1 py-2 px-4 rounded-md font-medium ${
+                orderType === 'SELL'
+                  ? 'bg-red-600 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              卖出
+            </button>
+          </div>
+
+          {/* 股票信息 */}
+          <div className="bg-gray-50 p-3 rounded-md">
+            <div className="flex justify-between items-center">
+              <span className="font-medium">{marketData.symbol}</span>
+              <span className="text-lg font-bold">${marketData.price.toFixed(2)}</span>
+            </div>
+          </div>
+
+          {/* 数量输入 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              数量 (股)
+            </label>
+            <input
+              type="number"
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="请输入股数"
+              min="1"
+              required
+            />
+          </div>
+
+          {/* 价格输入 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              价格 ($)
+            </label>
+            <div className="flex space-x-2">
+              <input
+                type="number"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="请输入价格"
+                step="0.01"
+                min="0.01"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setPrice(marketData.price.toString())}
+                className="px-3 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
+              >
+                市价
+              </button>
+            </div>
+          </div>
+
+          {/* 预估总额 */}
+          <div className="bg-blue-50 p-3 rounded-md">
+            <div className="flex justify-between">
+              <span className="text-sm text-blue-600">预估总额:</span>
+              <span className="font-medium text-blue-800">${estimatedTotal}</span>
+            </div>
+          </div>
+
+          {/* 错误和成功消息 */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-md p-3">
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
+          )}
+
+          {success && (
+            <div className="bg-green-50 border border-green-200 rounded-md p-3">
+              <p className="text-sm text-green-600">{success}</p>
+            </div>
+          )}
+
+          {/* 提交按钮 */}
+          <button
+            type="submit"
+            disabled={isLoading || !quantity || !price}
+            className={`w-full py-2 px-4 rounded-md font-medium ${
+              orderType === 'BUY'
+                ? 'bg-green-600 hover:bg-green-700 text-white'
+                : 'bg-red-600 hover:bg-red-700 text-white'
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
+          >
+            {isLoading ? '处理中...' : `${orderType === 'BUY' ? '买入' : '卖出'} ${marketData.symbol}`}
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}
