@@ -14,8 +14,8 @@ export class BotService {
 
   // 配置参数
   private readonly BOT_COUNT = 10; // 机器人数量
-  private readonly TRADE_INTERVAL = 100; // 交易间隔（毫秒）
-  private readonly PRICE_VARIANCE = 0.2; // 价格波动范围（2%）
+  private readonly TRADE_INTERVAL = 1000; // 交易间隔（毫秒）
+  private readonly PRICE_VARIANCE = 2; // 价格波动范围（200%）
   private readonly ORDER_TIMEOUT = 300000; // 订单超时时间（5分钟）
   private readonly MIN_ORDER_SIZE = 1; // 最小订单数量
   private readonly MAX_ORDER_SIZE = 20; // 最大订单数量（减小以增加交易频率）
@@ -336,9 +336,9 @@ export class BotService {
     }
 
     // 限价单：使用概率分布
-    // 价格偏离度：0.1%-5%，使用指数分布（越远离市价概率越低，但数量越大）
-    const maxDeviation = 0.05; // 最大5%偏离
-    const minDeviation = 0.001; // 最小0.1%偏离
+    // 价格偏离度：使用PRICE_VARIANCE参数控制最大偏离范围
+    const maxDeviation = this.PRICE_VARIANCE / 100; // 使用配置的价格波动范围
+    const minDeviation = 0.01; // 最小1%偏离
 
     // 使用指数分布生成价格偏离度
     const lambda = 3; // 指数分布参数，控制分布形状
@@ -433,7 +433,7 @@ export class BotService {
     }
 
     // 限价单：流动性订单偏向更接近市价，偏离度较小
-    const maxDeviation = 0.02; // 最大2%偏离（比普通订单小）
+    const maxDeviation = (this.PRICE_VARIANCE / 100) * 0.4; // 流动性订单使用40%的价格波动范围
     const minDeviation = 0.0005; // 最小0.05%偏离
 
     // 使用更陡峭的指数分布，让价格更集中在市价附近

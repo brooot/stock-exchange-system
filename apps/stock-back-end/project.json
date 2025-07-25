@@ -25,7 +25,10 @@
       "dependsOn": ["build"],
       "options": {
         "buildTarget": "stock-back-end:build",
-        "runBuildTargetDependencies": false
+        "runBuildTargetDependencies": false,
+        "buildTargetOptions": {
+          "outputPath": "dist/apps/stock-back-end"
+        }
       },
       "configurations": {
         "development": {
