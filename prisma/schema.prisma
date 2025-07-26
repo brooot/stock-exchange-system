@@ -50,6 +50,7 @@ model User {
 model Order {
   id              String      @id @default(uuid())
   userId          Int
+  symbol          String      @db.VarChar(10) // 股票代码
   type            OrderType   // BUY, SELL
   method          OrderMethod @default(LIMIT) // MARKET, LIMIT
   price           Decimal     @db.Decimal(16,2)
@@ -66,6 +67,7 @@ model Order {
   sellTrades Trade[] @relation("SellOrder")
 
   @@index([userId])
+  @@index([symbol])
   @@index([status])
   @@index([createdAt])
   @@map("orders")
@@ -107,5 +109,53 @@ model Position {
   @@index([userId])
   @@index([symbol])
   @@map("positions")
+}
+
+// K线周期类型枚举
+enum KlineInterval {
+  M1   // 1分钟
+  M5   // 5分钟
+  M15  // 15分钟
+  H1   // 1小时
+  D1   // 1天
+}
+
+// K线数据表（基础周期：1分钟）
+model KlineBase {
+  id        Int      @id @default(autoincrement())
+  symbol    String   @db.VarChar(10) // 股票代码
+  timestamp DateTime // K线时间戳（分钟级别对齐）
+  open      Decimal  @db.Decimal(16,4) // 开盘价
+  high      Decimal  @db.Decimal(16,4) // 最高价
+  low       Decimal  @db.Decimal(16,4) // 最低价
+  close     Decimal  @db.Decimal(16,4) // 收盘价
+  volume    Int      // 成交量
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([symbol, timestamp]) // 每个股票每分钟只能有一条记录
+  @@index([symbol, timestamp])
+  @@index([timestamp])
+  @@map("kline_base")
+}
+
+// K线数据表（高级周期：5分钟、15分钟、1小时、1天）
+model KlineAggregated {
+  id        Int           @id @default(autoincrement())
+  symbol    String        @db.VarChar(10) // 股票代码
+  interval  KlineInterval // 时间周期
+  timestamp DateTime      // K线时间戳（按周期对齐）
+  open      Decimal       @db.Decimal(16,4) // 开盘价
+  high      Decimal       @db.Decimal(16,4) // 最高价
+  low       Decimal       @db.Decimal(16,4) // 最低价
+  close     Decimal       @db.Decimal(16,4) // 收盘价
+  volume    Int           // 成交量
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@unique([symbol, interval, timestamp]) // 每个股票每个周期每个时间点只能有一条记录
+  @@index([symbol, interval, timestamp])
+  @@index([timestamp])
+  @@map("kline_aggregated")
 }
 

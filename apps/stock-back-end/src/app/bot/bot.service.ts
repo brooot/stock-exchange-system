@@ -16,7 +16,7 @@ export class BotService {
   private readonly BOT_COUNT = 10; // 机器人数量
   private readonly TRADE_INTERVAL = 1000; // 交易间隔（毫秒）
   private readonly PRICE_VARIANCE = 2; // 价格波动范围（200%）
-  private readonly ORDER_TIMEOUT = 300000; // 订单超时时间（5分钟）
+  private readonly ORDER_TIMEOUT = 1000000; // 订单超时时间 ms
   private readonly MIN_ORDER_SIZE = 1; // 最小订单数量
   private readonly MAX_ORDER_SIZE = 20; // 最大订单数量（减小以增加交易频率）
 
@@ -102,14 +102,14 @@ export class BotService {
         // 给机器人账户充值
         await this.userService.updateBalance(newBotUser.id, 100000); // 10万美元初始资金
 
-        // 为机器人账户添加初始持仓
-        await this.initializeBotPosition(newBotUser.id);
-
         this.logger.log(`创建机器人账户: ${botUsername}`);
 
         // 重新获取完整的用户信息
         botUser = await this.userService.findByUsername(botUsername);
       }
+
+      // 为所有机器人账户（包括现有的）初始化持仓
+      await this.initializeBotPosition(botUser.id);
 
       this.botUsers.push(botUser.id);
     }
@@ -124,7 +124,7 @@ export class BotService {
         'AAPL'
       );
 
-      if (!existingPosition) {
+      if (!existingPosition || existingPosition.quantity === 0) {
         // 随机生成初始持仓数量（100-500股）
         const initialQuantity = Math.floor(Math.random() * 401) + 100;
         // 随机生成平均成本价格（140-160美元）
@@ -139,6 +139,12 @@ export class BotService {
 
         this.logger.log(
           `为机器人 ${botUserId} 初始化持仓: ${initialQuantity}股 AAPL @ $${avgPrice.toFixed(
+            2
+          )}`
+        );
+      } else {
+        this.logger.log(
+          `机器人 ${botUserId} 已有持仓: ${existingPosition.quantity}股 AAPL @ $${existingPosition.avgPrice.toFixed(
             2
           )}`
         );
@@ -210,7 +216,12 @@ export class BotService {
       const canBuy = balance >= currentPrice * this.MIN_ORDER_SIZE;
       const canSell = holdingQuantity >= this.MIN_ORDER_SIZE;
 
+      this.logger.debug(
+        `机器人 ${botUserId} 交易检查: 余额=$${balance.toFixed(2)}, 持仓=${holdingQuantity}股, 当前价格=$${currentPrice.toFixed(2)}, 可买=${canBuy}, 可卖=${canSell}`
+      );
+
       if (!canBuy && !canSell) {
+        this.logger.debug(`机器人 ${botUserId} 既不能买也不能卖，跳过交易`);
         return; // 既不能买也不能卖
       }
 
@@ -219,8 +230,14 @@ export class BotService {
 
       if (!canBuy) {
         orderType = OrderType.SELL;
+        this.logger.debug(
+          `机器人 ${botUserId} 决策: 强制选择 ${orderType} (canBuy=${canBuy}, canSell=${canSell})`
+        );
       } else if (!canSell) {
         orderType = OrderType.BUY;
+        this.logger.debug(
+          `机器人 ${botUserId} 决策: 强制选择 ${orderType} (canBuy=${canBuy}, canSell=${canSell})`
+        );
       } else {
         // 两种操作都可以时，使用更平衡的策略
         let buyProbability = 0.5;
@@ -242,6 +259,10 @@ export class BotService {
 
         orderType =
           Math.random() < buyProbability ? OrderType.BUY : OrderType.SELL;
+        
+        this.logger.debug(
+          `机器人 ${botUserId} 决策: 持仓=${holdingQuantity}, 盈亏比=${profitRatio.toFixed(3)}, 买入概率=${buyProbability.toFixed(2)}, 选择=${orderType}`
+        );
       }
 
       // 生成订单价格和数量：使用概率分布，越靠近市价的订单数量越少
@@ -254,6 +275,9 @@ export class BotService {
         );
 
       if (!orderPrice || !quantity) {
+        this.logger.debug(
+          `机器人 ${botUserId} 无法生成有效订单: orderPrice=${orderPrice}, quantity=${quantity}, orderType=${orderType}`
+        );
         return; // 无法生成有效订单
       }
 
@@ -265,9 +289,17 @@ export class BotService {
         quantity
       );
 
+      if (!canPlaceOrder) {
+        this.logger.debug(
+          `机器人 ${botUserId} 最终检查失败: ${orderType} ${quantity}股 @ $${orderPrice.toFixed(2)}`
+        );
+        return;
+      }
+
       if (canPlaceOrder) {
         await this.orderService.createOrder(
           botUserId,
+          'AAPL', // 默认股票代码
           orderType,
           orderMethod,
           orderPrice,
@@ -618,6 +650,7 @@ export class BotService {
       if (canPlaceOrder) {
         await this.orderService.createOrder(
           botUserId,
+          'AAPL', // 默认股票代码
           orderType,
           orderMethod,
           orderPrice,

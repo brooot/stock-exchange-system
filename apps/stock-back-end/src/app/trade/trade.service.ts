@@ -84,7 +84,6 @@ export class TradeService {
       orderBy: { executedAt: 'desc' },
       take: 100, // 取最近100条交易记录
     });
-    // console.log('===> recentTrades: ', recentTrades);
     if (recentTrades.length === 0) {
       // 如果没有交易记录，返回默认数据
       return {

@@ -72,7 +72,9 @@ export class PositionService {
     } else {
       // SELL 订单
       if (existingPosition) {
-        const newQuantity = existingPosition.quantity - quantity;
+        // 确保不会卖出超过持仓的数量（在撮合阶段已经控制了数量）
+        const actualSellQuantity = Math.min(quantity, existingPosition.quantity);
+        const newQuantity = existingPosition.quantity - actualSellQuantity;
 
         if (newQuantity > 0) {
           // 更新持仓数量，保持平均成本价不变
@@ -87,7 +89,7 @@ export class PositionService {
               quantity: newQuantity,
             },
           });
-        } else if (newQuantity === 0) {
+        } else {
           // 清空持仓
           return this.prisma.position.delete({
             where: {
@@ -97,11 +99,11 @@ export class PositionService {
               },
             },
           });
-        } else {
-          throw new Error('卖出数量超过持仓数量');
         }
       } else {
-        throw new Error('没有持仓无法卖出');
+        // 没有持仓时，不进行任何操作（在撮合阶段应该已经过滤掉这种情况）
+        console.warn(`用户 ${userId} 没有 ${symbol} 持仓，但尝试卖出 ${quantity} 股`);
+        return null;
       }
     }
   }

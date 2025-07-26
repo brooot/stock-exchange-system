@@ -11,6 +11,7 @@ import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from './prisma/prisma.module';
 import { WebsocketModule } from './websocket/websocket.module';
 import { BotModule } from './bot/bot.module';
+import { KlineModule } from './kline/kline.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { BotModule } from './bot/bot.module';
     TradeModule,
     WebsocketModule,
     BotModule,
+    KlineModule,
   ],
   controllers: [AppController],
   providers: [

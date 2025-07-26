@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import Decimal from 'decimal.js';
 import { accountAPI, orderAPI, authAPI, tradeAPI, positionAPI } from '../../utils/api';
 import { useWebSocket } from '../../hooks/useWebSocket';
-import { AccountInfo, PositionTable, MarketData, TradingPanel, BotControl } from '../../components/dashboard';
+import { useKlineData } from '../../hooks/useKlineData';
+import { AccountInfo, PositionTable, MarketData, TradingPanel, BotControl, KLineChart } from '../../components/dashboard';
 
 interface AccountInfo {
   balance: string;
@@ -36,6 +37,7 @@ interface MarketData {
 export default function DashboardPage() {
   const router = useRouter();
   const { marketData, lastTrade, isConnected } = useWebSocket();
+  const { klineData, currentInterval, isLoading: klineLoading, changeInterval, getSupportedIntervals } = useKlineData();
 
   const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null);
   const [positions, setPositions] = useState<Position[]>([]);
@@ -59,7 +61,6 @@ export default function DashboardPage() {
   const fetchAccountInfo = async () => {
     try {
       const response = await accountAPI.getAccountInfo();
-      console.log('===> response.data: ', response.data);
       setAccountInfo(response.data);
     } catch (err: any) {
       if (err.response?.status === 401) {
@@ -120,33 +121,41 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
         <div className="space-y-6">
-          <AccountInfo 
+          <AccountInfo
             accountInfo={accountInfo}
             portfolioValue={portfolioValue}
           />
-          
-          <PositionTable 
+
+          <PositionTable
             positions={positions}
             marketData={marketData}
           />
-          
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <MarketData 
+            <MarketData
               marketData={marketData}
               isConnected={isConnected}
               lastTrade={lastTrade}
             />
-            
+
             <BotControl />
           </div>
-          
-          <TradingPanel 
+
+          <KLineChart
+            data={klineData}
+            interval={currentInterval}
+            onIntervalChange={changeInterval}
+            isLoading={klineLoading}
+            getSupportedIntervals={getSupportedIntervals}
+          />
+
+          <TradingPanel
              marketData={marketData}
              onCreateOrder={async (orderData) => {
                setLoading(true);
                setError('');
                setSuccess('');
-               
+
                try {
                  await orderAPI.createOrder(orderData);
                  setSuccess('订单提交成功！');

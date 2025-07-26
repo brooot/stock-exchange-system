@@ -39,4 +39,16 @@ export class MarketGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.emit('tradeCompleted', tradeData);
     this.logger.log('Trade completion broadcasted to all clients');
   }
+
+  // 广播价格更新事件（用于K线实时更新）
+  broadcastPriceUpdate(priceData: any) {
+    this.server.emit('priceUpdate', priceData);
+    this.logger.log('Price update broadcasted to all clients');
+  }
+
+  // 广播K线数据更新
+  broadcastKlineUpdate(klineData: any) {
+    this.server.emit('klineUpdate', klineData);
+    this.logger.log('Kline update broadcasted to all clients');
+  }
 }

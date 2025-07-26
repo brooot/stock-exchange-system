@@ -2,9 +2,13 @@ import { Controller, Post, Delete, Get, Body, Param, UseGuards, Request, Validat
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OrderService } from './order.service';
 import { OrderType, OrderMethod } from '@prisma/client';
-import { IsEnum, IsNumber, IsPositive, IsOptional } from 'class-validator';
+import { IsEnum, IsNumber, IsPositive, IsOptional, IsString, IsNotEmpty } from 'class-validator';
 
 class CreateOrderDto {
+  @IsString({ message: '股票代码必须是字符串' })
+  @IsNotEmpty({ message: '股票代码不能为空' })
+  symbol: string;
+
   @IsEnum(OrderType, { message: '订单类型必须是BUY或SELL' })
   type: OrderType;
 
@@ -34,6 +38,7 @@ export class OrderController {
     const userId = req.user.userId;
     return this.orderService.createOrder(
       userId,
+      createOrderDto.symbol,
       createOrderDto.type,
       createOrderDto.method || OrderMethod.LIMIT,
       createOrderDto.price,

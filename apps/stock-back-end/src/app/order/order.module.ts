@@ -4,9 +4,10 @@ import { OrderController } from './order.controller';
 import { UserModule } from '../user/user.module';
 import { PositionModule } from '../position/position.module';
 import { WebsocketModule } from '../websocket/websocket.module';
+import { KlineModule } from '../kline/kline.module';
 
 @Module({
-  imports: [UserModule, PositionModule, WebsocketModule],
+  imports: [UserModule, PositionModule, WebsocketModule, KlineModule],
   providers: [OrderService],
   controllers: [OrderController],
   exports: [OrderService],

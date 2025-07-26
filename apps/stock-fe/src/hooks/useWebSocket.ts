@@ -41,7 +41,6 @@ export const useWebSocket = () => {
   useEffect(() => {
     // 获取初始市场数据
     fetchInitialMarketData();
-    console.log('===> process.env: ', process.env.NEXT_PUBLIC_BACKEND_HOST, process.env.NEXT_PUBLIC_BACKEND_PORT);
     // 连接到WebSocket服务器
     const socket = io(
       `http://${process.env.NEXT_PUBLIC_BACKEND_HOST}:${process.env.NEXT_PUBLIC_BACKEND_PORT}/market`,
