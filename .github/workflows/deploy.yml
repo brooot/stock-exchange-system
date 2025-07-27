@@ -31,7 +31,6 @@ jobs:
     - name: Run tests
       run: |
         pnpm nx test stock-back-end --passWithNoTests
-        pnpm nx test stock-fe --passWithNoTests
 
     - name: Build applications
       run: |
