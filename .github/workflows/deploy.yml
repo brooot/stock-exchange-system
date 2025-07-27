@@ -87,7 +87,7 @@ jobs:
           # 检查健康状态（带重试）
           for i in {1..5}; do
             echo "检查服务健康状态 (第 $i 次)"
-            if curl -f http://localhost:3000 && curl -f http://localhost:3002/api/health; then
+            if curl -f http://localhost:3000 && curl -f http://localhost:3002/api; then
               echo "所有服务健康检查通过"
               exit 0
             else
