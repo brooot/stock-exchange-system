@@ -57,18 +57,47 @@ jobs:
           # 清理Docker缓存（可选）
           docker system prune -f
           
-          # 构建并启动服务
-          docker compose -f docker-compose.prod.yml up -d --build
+          # 设置Docker镜像拉取重试
+          export DOCKER_BUILDKIT=1
+          export COMPOSE_DOCKER_CLI_BUILD=1
+          
+          # 构建并启动服务（带重试机制）
+          for i in {1..3}; do
+            echo "尝试启动服务 (第 $i 次)"
+            if docker compose -f docker-compose.prod.yml up -d --build --timeout 300; then
+              echo "服务启动成功"
+              break
+            else
+              echo "第 $i 次启动失败，等待 30 秒后重试"
+              docker compose -f docker-compose.prod.yml down
+              sleep 30
+              if [ $i -eq 3 ]; then
+                echo "所有重试都失败了"
+                exit 1
+              fi
+            fi
+          done
           
           # 等待服务启动
-          sleep 30
+          sleep 60
           
           # 检查服务状态
           docker compose -f docker-compose.prod.yml ps
           
-          # 检查健康状态
-          curl -f http://localhost:3000 || exit 1
-          curl -f http://localhost:3002/api/health || exit 1
+          # 检查健康状态（带重试）
+          for i in {1..5}; do
+            echo "检查服务健康状态 (第 $i 次)"
+            if curl -f http://localhost:3000 && curl -f http://localhost:3002/api/health; then
+              echo "所有服务健康检查通过"
+              exit 0
+            else
+              echo "健康检查失败，等待 10 秒后重试"
+              sleep 10
+            fi
+          done
+          
+          echo "健康检查最终失败"
+          exit 1
 
     - name: Notify deployment status
       if: always()
