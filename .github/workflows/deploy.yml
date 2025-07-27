@@ -1,0 +1,81 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install pnpm
+      uses: pnpm/action-setup@v2
+      with:
+        version: 8
+
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+
+    - name: Run tests
+      run: |
+        pnpm nx test stock-back-end --passWithNoTests
+        pnpm nx test stock-fe --passWithNoTests
+
+    - name: Build applications
+      run: |
+        pnpm nx build stock-back-end
+        pnpm nx build stock-fe
+
+    - name: Deploy to server
+      if: github.ref == 'refs/heads/main'
+      uses: appleboy/ssh-action@v0.1.5
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.KEY }}
+        port: ${{ secrets.PORT || 22 }}
+        script: |
+          cd ${{ secrets.PROJECT_PATH || '/opt/stock-exchange-system' }}
+          
+          # 停止现有服务
+          docker compose -f docker-compose.prod.yml down
+          
+          # 拉取最新代码
+          git pull origin main
+          
+          # 清理Docker缓存（可选）
+          docker system prune -f
+          
+          # 构建并启动服务
+          docker compose -f docker-compose.prod.yml up -d --build
+          
+          # 等待服务启动
+          sleep 30
+          
+          # 检查服务状态
+          docker compose -f docker-compose.prod.yml ps
+          
+          # 检查健康状态
+          curl -f http://localhost:3000 || exit 1
+          curl -f http://localhost:3002/api/health || exit 1
+
+    - name: Notify deployment status
+      if: always()
+      run: |
+        if [ "${{ job.status }}" == "success" ]; then
+          echo "✅ Deployment successful!"
+        else
+          echo "❌ Deployment failed!"
+        fi

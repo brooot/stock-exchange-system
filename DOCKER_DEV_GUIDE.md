@@ -46,33 +46,33 @@
 
 ```bash
 # 启动所有服务
-docker-compose -f docker-compose.dev.yml up -d
+docker compose -f docker-compose.dev.yml up -d
 
 # 查看日志
-docker-compose -f docker-compose.dev.yml logs -f stock-back-end-dev
+docker compose -f docker-compose.dev.yml logs -f stock-back-end-dev
 
 # 查看服务状态
-docker-compose -f docker-compose.dev.yml ps
+docker compose -f docker-compose.dev.yml ps
 ```
 
 ### 停止服务
 
 ```bash
 # 停止服务
-docker-compose -f docker-compose.dev.yml down
+docker compose -f docker-compose.dev.yml down
 
 # 停止并清理卷
-docker-compose -f docker-compose.dev.yml down -v
+docker compose -f docker-compose.dev.yml down -v
 ```
 
 ### 重建服务
 
 ```bash
 # 重建后端服务
-docker-compose -f docker-compose.dev.yml build stock-back-end-dev
+docker compose -f docker-compose.dev.yml build stock-back-end-dev
 
 # 重建并启动
-docker-compose -f docker-compose.dev.yml up --build -d
+docker compose -f docker-compose.dev.yml up --build -d
 ```
 
 ## 🐛 故障排除
@@ -106,7 +106,7 @@ docker-compose -f docker-compose.dev.yml up --build -d
 docker stats
 
 # 查看容器详细信息
-docker-compose -f docker-compose.dev.yml top
+docker compose -f docker-compose.dev.yml top
 ```
 
 ## 📊 预期性能提升

@@ -141,7 +141,11 @@ export default function KLineChart({
     const timer = setTimeout(() => {
       if (chartRef.current) {
         chartInstance.current = echarts.init(chartRef.current);
-        setIsChartReady(true);
+        // 确保图表正确计算容器尺寸
+        setTimeout(() => {
+          chartInstance.current?.resize();
+          setIsChartReady(true);
+        }, 50);
       }
     }, 100);
 
@@ -342,7 +346,7 @@ export default function KLineChart({
           {
             type: 'inside',
             xAxisIndex: [0, 1],
-            start: Math.max(0, 100 - (100 / data.length) * 50),
+            start: data.length <= 50 ? 0 : Math.max(0, 100 - (100 / data.length) * 50),
             end: 100
           },
           {
@@ -350,7 +354,7 @@ export default function KLineChart({
             xAxisIndex: [0, 1],
             type: 'slider',
             top: '85%',
-            start: Math.max(0, 100 - (100 / data.length) * 50),
+            start: data.length <= 50 ? 0 : Math.max(0, 100 - (100 / data.length) * 50),
             end: 100
           }
         ],

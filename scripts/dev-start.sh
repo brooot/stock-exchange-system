@@ -23,7 +23,7 @@ export DOCKER_BUILDKIT=1
 export COMPOSE_DOCKER_CLI_BUILD=1
 
 echo "📦 清理旧容器和卷..."
-docker-compose -f docker-compose.dev.yml down --remove-orphans
+docker compose -f docker-compose.dev.yml down --remove-orphans
 
 # 可选：清理未使用的镜像和卷（节省空间）
 if [ "$1" = "--clean" ]; then
@@ -33,17 +33,17 @@ if [ "$1" = "--clean" ]; then
 fi
 
 echo "🔨 构建开发镜像..."
-docker-compose -f docker-compose.dev.yml build --parallel
+docker compose -f docker-compose.dev.yml build --parallel
 
 echo "🏃 启动服务..."
-docker-compose -f docker-compose.dev.yml up -d
+docker compose -f docker-compose.dev.yml up -d
 
 echo "⏳ 等待服务启动..."
 sleep 10
 
 # 检查服务状态
 echo "📊 检查服务状态:"
-docker-compose -f docker-compose.dev.yml ps
+docker compose -f docker-compose.dev.yml ps
 
 echo "📝 查看后端日志 (按 Ctrl+C 退出):"
-docker-compose -f docker-compose.dev.yml logs -f stock-back-end-dev
+docker compose -f docker-compose.dev.yml logs -f stock-back-end-dev

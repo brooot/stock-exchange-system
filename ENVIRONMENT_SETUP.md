@@ -53,7 +53,7 @@ DATABASE_URL="postgresql://postgres:your_password@postgres:5432/stock_db?schema=
 3. **开发环境启动**：
    ```bash
    # 使用 Docker 开发环境
-   docker-compose -f docker-compose.dev.yml up -d
+   docker compose -f docker-compose.dev.yml up -d
    
    # 或本地开发（需要本地 PostgreSQL）
    pnpm install
@@ -67,7 +67,7 @@ DATABASE_URL="postgresql://postgres:your_password@postgres:5432/stock_db?schema=
    # 编辑 .env.production 文件，设置生产环境的安全密码
    
    # 启动生产环境
-   docker-compose -f docker-compose.prod.yml up -d
+   docker compose -f docker-compose.prod.yml up -d
    ```
 
 ### 重要注意事项
