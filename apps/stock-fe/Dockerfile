@@ -27,6 +27,17 @@ COPY apps/stock-fe/.swcrc apps/stock-fe/
 COPY apps/stock-fe/next-env.d.ts apps/stock-fe/
 COPY apps/stock-fe/index.d.ts apps/stock-fe/
 
+# 设置构建时环境变量
+ARG NEXT_PUBLIC_BACKEND_HOST
+ARG NEXT_PUBLIC_BACKEND_PORT
+ENV NEXT_PUBLIC_BACKEND_HOST=$NEXT_PUBLIC_BACKEND_HOST
+ENV NEXT_PUBLIC_BACKEND_PORT=$NEXT_PUBLIC_BACKEND_PORT
+
+# 调试：输出环境变量
+RUN echo "NEXT_PUBLIC_BACKEND_HOST: $NEXT_PUBLIC_BACKEND_HOST"
+RUN echo "NEXT_PUBLIC_BACKEND_PORT: $NEXT_PUBLIC_BACKEND_PORT"
+RUN env | grep NEXT_PUBLIC
+
 # 构建应用
 RUN pnpm nx build stock-fe
 

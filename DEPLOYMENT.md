@@ -139,7 +139,7 @@ docker compose -f docker-compose.prod.yml logs -f stock-back-end
 curl http://localhost/health
 
 # 后端健康检查
-curl http://localhost:3002/api/health
+curl http://localhost:3001/api/health
 ```
 
 ## 🛠️ 故障排除

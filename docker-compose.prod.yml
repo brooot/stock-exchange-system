@@ -16,8 +16,7 @@ services:
     networks:
       - stock-network
     healthcheck:
-      test:
-        ['CMD-SHELL', 'pg_isready -U postgres -d stock_db']
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d stock_db']
       interval: 5s
       timeout: 5s
       retries: 5
@@ -40,7 +39,7 @@ services:
       - DATABASE_SYNC=${DATABASE_SYNC:-false}
       - DATABASE_URL=postgresql://${DATABASE_USERNAME}:${DATABASE_PASSWORD}@${DATABASE_HOST:-postgres}:${DATABASE_PORT:-5432}/${DATABASE_NAME}?schema=public
     ports:
-      - '3002:3001'
+      - '3001:3001'
     depends_on:
       postgres:
         condition: service_healthy
@@ -52,11 +51,14 @@ services:
     build:
       context: .
       dockerfile: apps/stock-fe/Dockerfile
+      args:
+        NEXT_PUBLIC_BACKEND_HOST: localhost
+        NEXT_PUBLIC_BACKEND_PORT: 3001
     container_name: stock-fe
     environment:
       - NODE_ENV=production
       - NEXT_PUBLIC_BACKEND_HOST=localhost
-      - NEXT_PUBLIC_BACKEND_PORT=3002
+      - NEXT_PUBLIC_BACKEND_PORT=3001
     ports:
       - '3000:3000'
     depends_on:
