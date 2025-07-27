@@ -7,4 +7,4 @@ export class AppService {
   }
 }
 // 热更新
-export const messageForTest = 'Hello API Test';
+export const messageForTest = 'Hello API';
