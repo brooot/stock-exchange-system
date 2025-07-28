@@ -1,0 +1,19 @@
+# 专门用于本地构建镜像的 docker-compose 文件
+# 使用方法：docker-compose -f docker-compose.build.yml build
+
+services:
+  # 后端服务构建
+  stock-back-end:
+    build:
+      context: .
+      dockerfile: apps/stock-back-end/Dockerfile
+    image: stock-back-end:latest
+    container_name: stock-back-end-build
+
+  # 前端服务构建
+  stock-fe:
+    build:
+      context: .
+      dockerfile: apps/stock-fe/Dockerfile
+    image: stock-fe:latest
+    container_name: stock-fe-build
