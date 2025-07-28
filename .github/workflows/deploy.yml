@@ -69,7 +69,7 @@ jobs:
           cd ${{ secrets.PROJECT_PATH || '/opt/stock-exchange-system' }}
 
           # 停止现有服务
-          docker compose -f docker-compose.prod.yml down
+          docker compose -f docker-compose.prod.yml --env-file .env.production down
 
           # 拉取最新代码
           git pull origin main
@@ -88,7 +88,7 @@ jobs:
 
           # 启动服务（无需构建，直接使用预构建镜像）
           echo "启动服务..."
-          docker compose -f docker-compose.prod.yml up -d
+          docker compose -f docker-compose.prod.yml --env-file .env.production up -d
 
           # 等待服务启动（增加等待时间）
           echo "等待服务完全启动..."
@@ -96,10 +96,10 @@ jobs:
 
           # 检查服务状态
           echo "检查Docker容器状态:"
-          docker compose -f docker-compose.prod.yml ps
+          docker compose -f docker-compose.prod.yml --env-file .env.production ps
 
           echo "检查Docker容器日志:"
-          docker compose -f docker-compose.prod.yml logs --tail=50
+          docker compose -f docker-compose.prod.yml --env-file .env.production logs --tail=50
 
           # 检查健康状态（带重试，增加重试次数和等待时间）
           for i in {1..6}; do
@@ -136,8 +136,8 @@ jobs:
 
           echo "❌ 健康检查最终失败"
           echo "输出最终的容器状态和日志:"
-          docker compose -f docker-compose.prod.yml ps
-          docker compose -f docker-compose.prod.yml logs
+          docker compose -f docker-compose.prod.yml --env-file .env.production ps
+          docker compose -f docker-compose.prod.yml --env-file .env.production logs
           exit 1
 
     - name: Notify deployment status
