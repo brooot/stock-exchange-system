@@ -1,5 +1,7 @@
 FROM docker.io/node:22.17.0-alpine
 
+# 设置Node.js内存限制（针对2G内存服务器优化）
+ENV NODE_OPTIONS="--max-old-space-size=512"
 ENV HOST=0.0.0.0
 ENV PORT=3001
 
@@ -18,8 +20,10 @@ RUN npm install -g pnpm@9.15.0 && \
     npm cache clean --force && \
     rm -rf ~/.npm
 
-# 安装生产依赖
-RUN pnpm install --production
+# 安装生产依赖（优化安装过程）
+RUN pnpm install --production --prefer-offline && \
+    pnpm store prune && \
+    rm -rf ~/.pnpm-store
 
 # 生成 Prisma 客户端
 RUN pnpm prisma generate

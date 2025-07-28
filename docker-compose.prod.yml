@@ -26,7 +26,18 @@ services:
     build:
       context: .
       dockerfile: apps/stock-back-end/Dockerfile
+      # 限制构建资源使用（针对小内存服务器）
+      shm_size: 128m
     container_name: stock-back-end
+    # 限制运行时资源使用（针对2核2G服务器优化）
+    deploy:
+      resources:
+        limits:
+          cpus: '0.8'
+          memory: 400M
+        reservations:
+          cpus: '0.3'
+          memory: 200M
     env_file:
       - .env.production
     environment:
@@ -54,7 +65,18 @@ services:
       args:
         NEXT_PUBLIC_BACKEND_HOST: 121.199.170.204
         NEXT_PUBLIC_BACKEND_PORT: 3001
+      # 限制构建资源使用（针对小内存服务器）
+      shm_size: 256m
     container_name: stock-fe
+    # 限制运行时资源使用（针对2核2G服务器优化）
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 600M
+        reservations:
+          cpus: '0.4'
+          memory: 300M
     environment:
       - NODE_ENV=production
       - NEXT_PUBLIC_BACKEND_HOST=121.199.170.204

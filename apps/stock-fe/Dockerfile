@@ -3,6 +3,9 @@ FROM node:22.17.0-alpine AS builder
 
 WORKDIR /app
 
+# 设置Node.js内存限制（针对2G内存服务器优化）
+ENV NODE_OPTIONS="--max-old-space-size=1024"
+
 # 安装pnpm
 RUN npm install -g pnpm
 
@@ -17,8 +20,8 @@ COPY apps/stock-fe/next.config.js apps/stock-fe/
 COPY apps/stock-fe/tailwind.config.js apps/stock-fe/
 COPY apps/stock-fe/postcss.config.js apps/stock-fe/
 
-# 安装依赖
-RUN pnpm install --frozen-lockfile
+# 安装依赖（只安装必要的依赖）
+RUN pnpm install --frozen-lockfile --prefer-offline
 
 # 复制源代码
 COPY apps/stock-fe/src apps/stock-fe/src
@@ -33,8 +36,8 @@ ARG NEXT_PUBLIC_BACKEND_PORT
 ENV NEXT_PUBLIC_BACKEND_HOST=$NEXT_PUBLIC_BACKEND_HOST
 ENV NEXT_PUBLIC_BACKEND_PORT=$NEXT_PUBLIC_BACKEND_PORT
 
-# 构建应用
-RUN pnpm nx build stock-fe
+# 构建应用（限制并发数和内存使用）
+RUN NODE_OPTIONS="--max-old-space-size=1024" pnpm nx build stock-fe --parallel=1
 
 # 生产阶段 - 使用Node.js运行Next.js
 FROM node:22.17.0-alpine AS runner
@@ -51,8 +54,10 @@ RUN npm install -g pnpm
 # 复制package文件用于安装运行时依赖
 COPY --from=builder /app/package.json /app/pnpm-lock.yaml ./
 
-# 只安装生产依赖
-RUN pnpm install --prod --frozen-lockfile && pnpm store prune
+# 只安装生产依赖（优化安装过程）
+RUN pnpm install --prod --frozen-lockfile --prefer-offline && \
+    pnpm store prune && \
+    rm -rf ~/.pnpm-store
 
 # 复制构建产物
 COPY --from=builder --chown=nextjs:nodejs /app/dist/apps/stock-fe/.next ./.next

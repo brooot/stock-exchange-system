@@ -54,8 +54,26 @@ jobs:
           # 拉取最新代码
           git pull origin main
 
-          # 清理Docker缓存（可选）
-          docker system prune -f
+          # 清理Docker缓存和旧镜像
+          docker system prune -af --volumes
+          docker builder prune -af
+
+          # 在服务器上分步构建应用（针对2G内存服务器优化）
+          echo "在服务器上构建应用..."
+          
+          # 设置Node.js内存限制
+          export NODE_OPTIONS="--max-old-space-size=1024"
+          
+          # 安装依赖
+          pnpm install --frozen-lockfile --prefer-offline
+          
+          # 分步构建，避免内存不足
+          echo "构建后端应用..."
+          NODE_OPTIONS="--max-old-space-size=512" pnpm nx build stock-back-end
+          
+          echo "清理缓存后构建前端..."
+          pnpm store prune
+          NODE_OPTIONS="--max-old-space-size=1024" pnpm nx build stock-fe
 
           # 设置Docker镜像拉取重试和超时配置
           export DOCKER_BUILDKIT=1
@@ -68,10 +86,14 @@ jobs:
           docker pull postgres:16-alpine || echo "postgres镜像拉取失败，将在构建时重试"
           docker pull node:22.17.0-alpine || echo "node镜像拉取失败，将在构建时重试"
 
-          # 构建并启动服务（带重试机制）
+          # 构建并启动服务（带重试机制，针对小内存服务器优化）
           for i in {1..3}; do
             echo "尝试启动服务 (第 $i 次)"
-            if timeout 900 docker compose -f docker-compose.prod.yml up -d --build; then
+            # 分步启动服务，避免同时构建多个镜像
+            if timeout 300 docker compose -f docker-compose.prod.yml build postgres && \
+               timeout 400 docker compose -f docker-compose.prod.yml build stock-back-end && \
+               timeout 500 docker compose -f docker-compose.prod.yml build stock-fe && \
+               timeout 180 docker compose -f docker-compose.prod.yml up -d; then
               echo "服务启动成功"
               break
             else
