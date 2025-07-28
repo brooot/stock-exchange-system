@@ -1,7 +1,6 @@
 FROM docker.io/node:22.17.0-alpine
 
-# 设置Node.js内存限制（针对2G内存服务器优化）
-ENV NODE_OPTIONS="--max-old-space-size=512"
+# Node.js环境配置
 ENV HOST=0.0.0.0
 ENV PORT=3001
 

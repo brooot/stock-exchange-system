@@ -1,3 +1,7 @@
+# 全局环境变量文件
+env_file:
+  - .env.production
+
 services:
   # PostgreSQL数据库服务（保持不变）
   postgres:

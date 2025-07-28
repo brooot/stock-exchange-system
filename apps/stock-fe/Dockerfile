@@ -3,8 +3,7 @@ FROM node:22.17.0-alpine AS builder
 
 WORKDIR /app
 
-# 设置Node.js内存限制（针对2G内存服务器优化）
-ENV NODE_OPTIONS="--max-old-space-size=1024"
+# Node.js环境配置
 
 # 安装pnpm
 RUN npm install -g pnpm
@@ -36,8 +35,8 @@ ARG NEXT_PUBLIC_BACKEND_PORT
 ENV NEXT_PUBLIC_BACKEND_HOST=$NEXT_PUBLIC_BACKEND_HOST
 ENV NEXT_PUBLIC_BACKEND_PORT=$NEXT_PUBLIC_BACKEND_PORT
 
-# 构建应用（限制并发数和内存使用）
-RUN NODE_OPTIONS="--max-old-space-size=1024" pnpm nx build stock-fe --parallel=1
+# 构建应用
+RUN pnpm nx build stock-fe
 
 # 生产阶段 - 使用Node.js运行Next.js
 FROM node:22.17.0-alpine AS runner
