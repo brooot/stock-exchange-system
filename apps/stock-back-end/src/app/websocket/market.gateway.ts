@@ -9,7 +9,12 @@ import { Logger } from '@nestjs/common';
 
 @WebSocketGateway({
   cors: {
-    origin: ['http://localhost:3000', 'http://localhost:3001'],
+    origin: [
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://121.199.170.204:3000', // 添加生产环境前端地址
+      'http://121.199.170.204:3001', // 添加生产环境后端地址
+    ],
     credentials: true,
   },
   namespace: '/market',

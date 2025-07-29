@@ -4,6 +4,9 @@ FROM docker.io/node:22.17.0-alpine
 ENV HOST=0.0.0.0
 ENV PORT=3001
 
+# 安装系统依赖
+RUN apk add --no-cache python3 make g++
+
 WORKDIR /app
 
 # 创建非root用户
@@ -14,15 +17,11 @@ RUN addgroup --system stock-back-end && \
 COPY dist/apps/stock-back-end/ ./
 # 复制 Prisma schema
 COPY prisma ./prisma
-# 安装pnpm并清理npm缓存
-RUN npm install -g pnpm@9.15.0 && \
-    npm cache clean --force && \
-    rm -rf ~/.npm
+# 安装pnpm
+RUN npm install -g pnpm@9.15.0
 
 # 安装生产依赖（优化安装过程）
-RUN pnpm install --production --prefer-offline && \
-    pnpm store prune && \
-    rm -rf ~/.pnpm-store
+RUN pnpm install --frozen-lockfile
 
 # 生成 Prisma 客户端
 RUN pnpm prisma generate
