@@ -3,7 +3,6 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UserService } from '../user/user.service';
 import { OrderService } from '../order/order.service';
 import { OrderType, OrderMethod } from '@prisma/client';
-import { Decimal } from '@prisma/client/runtime/library';
 
 @Injectable()
 export class BotService {
