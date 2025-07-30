@@ -68,7 +68,7 @@ services:
           memory: 300M
     environment:
       - NODE_ENV=production
-      - NEXT_PUBLIC_BACKEND_HOST=121.199.170.204
+      - NEXT_PUBLIC_BACKEND_HOST=www.brooot.top
       - NEXT_PUBLIC_BACKEND_PORT=3001
     ports:
       - '3000:3000'

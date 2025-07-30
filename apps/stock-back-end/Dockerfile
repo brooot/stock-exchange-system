@@ -13,15 +13,19 @@ WORKDIR /app
 RUN addgroup --system stock-back-end && \
     adduser --system -G stock-back-end stock-back-end
 
+# 安装pnpm
+RUN npm install -g pnpm@9.15.0
+
+# 复制依赖文件
+COPY package.json pnpm-lock.yaml ./
+
+# 安装生产依赖（优化安装过程）
+RUN pnpm install --prod --frozen-lockfile
+
 # 直接复制Nx构建好的产物（由project.json中的build任务生成）
 COPY dist/apps/stock-back-end/ ./
 # 复制 Prisma schema
 COPY prisma ./prisma
-# 安装pnpm
-RUN npm install -g pnpm@9.15.0
-
-# 安装生产依赖（优化安装过程）
-RUN pnpm install --frozen-lockfile
 
 # 生成 Prisma 客户端
 RUN pnpm prisma generate
