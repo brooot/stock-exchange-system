@@ -12,6 +12,8 @@ import { PrismaModule } from './prisma/prisma.module';
 import { WebsocketModule } from './websocket/websocket.module';
 import { BotModule } from './bot/bot.module';
 import { KlineModule } from './kline/kline.module';
+import { RedisModule } from './redis/redis.module';
+import { QueueModule } from './queue/queue.module';
 
 @Module({
   imports: [
@@ -20,6 +22,8 @@ import { KlineModule } from './kline/kline.module';
       envFilePath: process.env.NODE_ENV === 'production' ? '.env.production' : '.env.development'
     }), // 根据环境动态加载环境变量文件
     PrismaModule,
+    RedisModule,
+    QueueModule,
     AuthModule,
     UserModule,
     OrderModule,

@@ -11,6 +11,8 @@ import { MarketGateway } from '../websocket/market.gateway';
 import { KlineService } from '../kline/kline.service';
 import { OrderType, OrderStatus, OrderMethod } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import { Queue } from 'bull';
+import { InjectQueue } from '@nestjs/bull';
 
 @Injectable()
 export class OrderService {
@@ -19,11 +21,85 @@ export class OrderService {
     private userService: UserService,
     private positionService: PositionService,
     private marketGateway: MarketGateway,
-    private klineService: KlineService
+    private klineService: KlineService,
+    @InjectQueue('order-processing') private orderQueue: Queue,
+    @InjectQueue('trade-processing') private tradeQueue: Queue
   ) {}
 
-  /** 创建订单 */
+  /** 创建订单 - 异步处理版本 */
   async createOrder(
+    userId: number,
+    symbol: string,
+    type: OrderType,
+    method: OrderMethod,
+    price: number,
+    quantity: number
+  ) {
+    // 验证输入
+    if (price <= 0 || quantity <= 0) {
+      throw new BadRequestException('价格和数量必须大于0');
+    }
+
+    // 获取用户信息
+    const user = await this.userService.findById(userId);
+
+    // 检查资金/持仓
+    if (type === OrderType.BUY) {
+      const requiredAmount = price * quantity;
+      if (user.balance.toNumber() < requiredAmount) {
+        throw new BadRequestException('余额不足');
+      }
+    } else {
+      // 检查持仓
+      const hasEnoughPosition = await this.positionService.checkSellQuantity(
+        userId,
+        symbol,
+        quantity
+      );
+      if (!hasEnoughPosition) {
+        throw new BadRequestException('持仓不足');
+      }
+    }
+
+    // 创建订单
+    const order = await this.prisma.order.create({
+      data: {
+        userId,
+        symbol,
+        type,
+        method,
+        price: new Decimal(price),
+        quantity,
+        status: 'OPEN',
+      },
+    });
+
+    // 添加到队列进行异步处理
+    const priority = method === OrderMethod.MARKET ? 10 : 0; // 市价单优先级更高
+    await this.orderQueue.add(
+      'process-order',
+      {
+        userId,
+        symbol,
+        type,
+        method,
+        price,
+        quantity,
+        orderId: order.id,
+        timestamp: Date.now(),
+      },
+      { priority }
+    );
+
+    return {
+      id: order.id,
+      status: 'PENDING', // 订单已提交，等待处理
+      message: '订单已提交，正在处理中',
+    };
+  }
+
+  /** 同步订单处理 - 用于队列处理器调用 */
+  async createOrderSync(
     userId: number,
     symbol: string,
     type: OrderType,
@@ -144,6 +220,9 @@ export class OrderService {
 
     // 使用数据库事务执行撮合
     const result = await this.prisma.$transaction(async (prisma) => {
+      // 跟踪事务内的持仓变化
+      const positionChanges = new Map<number, number>();
+
       // 执行撮合
       for (const oppositeOrder of oppositeOrders) {
         if (remainingQuantity <= 0) break;
@@ -152,7 +231,7 @@ export class OrderService {
           oppositeOrder.quantity - oppositeOrder.filledQuantity;
         if (availableQuantity <= 0) continue;
 
-        // 简化的持仓检查逻辑：只检查卖方持仓
+        // 改进的持仓检查逻辑：考虑事务内的持仓变化
         let maxTradeQuantity = Math.min(remainingQuantity, availableQuantity);
 
         // 确定卖方用户ID和检查持仓
@@ -162,7 +241,12 @@ export class OrderService {
           sellerId,
           symbol
         );
-        const availablePosition = sellerPosition ? sellerPosition.quantity : 0;
+        let availablePosition = sellerPosition ? sellerPosition.quantity : 0;
+
+        // 考虑事务内已经发生的持仓变化
+        const positionChange = positionChanges.get(sellerId) || 0;
+        availablePosition += positionChange;
+
         maxTradeQuantity = Math.min(maxTradeQuantity, availablePosition);
 
         const tradeQuantity = maxTradeQuantity;
@@ -170,14 +254,25 @@ export class OrderService {
         // 如果没有可交易数量，跳过这个订单
         if (tradeQuantity <= 0) continue;
 
-        // 优化的成交价格计算：使用对手盘价格（价格优先原则）
+        // 正确的成交价格计算：遵循价格优先和时间优先原则
         let tradePrice: number;
         if (newOrder.method === OrderMethod.MARKET) {
           // 市价单直接使用对手盘价格成交
           tradePrice = oppositeOrder.price.toNumber();
         } else {
-          // 限价单使用对手盘价格成交（遵循价格优先原则）
-          tradePrice = oppositeOrder.price.toNumber();
+          // 限价单撮合：使用对双方都有利的价格
+          // 买单：使用较低价格（买方限价和卖方限价中的较低者）
+          // 卖单：使用较高价格（买方限价和卖方限价中的较高者）
+          const newOrderPrice = newOrder.price.toNumber();
+          const oppositeOrderPrice = oppositeOrder.price.toNumber();
+
+          if (newOrder.type === OrderType.BUY) {
+            // 新订单是买单，使用较低价格（对买方有利）
+            tradePrice = Math.min(newOrderPrice, oppositeOrderPrice);
+          } else {
+            // 新订单是卖单，使用较高价格（对卖方有利）
+            tradePrice = Math.max(newOrderPrice, oppositeOrderPrice);
+          }
         }
         tradePrice = Math.round(tradePrice * 100) / 100; // 保留2位小数
 
@@ -235,7 +330,8 @@ export class OrderService {
           newOrder.type === 'BUY' ? newOrder : oppositeOrder,
           newOrder.type === 'SELL' ? newOrder : oppositeOrder,
           tradePrice,
-          tradeQuantity
+          tradeQuantity,
+          positionChanges
         );
 
         filledQuantity += tradeQuantity;
@@ -302,7 +398,8 @@ export class OrderService {
     buyOrder: any,
     sellOrder: any,
     price: number,
-    quantity: number
+    quantity: number,
+    positionChanges?: Map<number, number>
   ) {
     const tradeAmount = price * quantity;
     const symbol = buyOrder.symbol || sellOrder.symbol;
@@ -338,6 +435,14 @@ export class OrderService {
         quantity,
         price
       );
+
+      // 如果提供了持仓变化跟踪，更新它
+      if (positionChanges) {
+        const currentSellerChange = positionChanges.get(sellOrder.userId) || 0;
+        const currentBuyerChange = positionChanges.get(buyOrder.userId) || 0;
+        positionChanges.set(sellOrder.userId, currentSellerChange - quantity);
+        positionChanges.set(buyOrder.userId, currentBuyerChange + quantity);
+      }
     });
   }
 

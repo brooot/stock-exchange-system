@@ -1,4 +1,26 @@
 services:
+  # Redis 缓存和消息队列服务
+  redis:
+    image: redis:7-alpine
+    container_name: stock-redis
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis-data:/data
+    networks:
+      - stock-network
+    command: redis-server --appendonly yes
+    # 限制运行时资源使用（针对2核2G服务器优化）
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 200M
+        reservations:
+          cpus: '0.1'
+          memory: 100M
+    restart: unless-stopped
+
   # PostgreSQL数据库服务（保持不变）
   postgres:
     image: postgres:16-alpine
@@ -46,11 +68,17 @@ services:
       - DATABASE_NAME=${DATABASE_NAME}
       - DATABASE_SYNC=${DATABASE_SYNC:-false}
       - DATABASE_URL=postgresql://${DATABASE_USERNAME}:${DATABASE_PASSWORD}@${DATABASE_HOST:-postgres}:${DATABASE_PORT:-5432}/${DATABASE_NAME}?schema=public
+      # Redis 配置
+      - REDIS_HOST=${REDIS_HOST:-redis}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
     ports:
       - '3001:3001'
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_started
     networks:
       - stock-network
 
@@ -84,4 +112,6 @@ networks:
 
 volumes:
   postgres-data:
+    driver: local
+  redis-data:
     driver: local
