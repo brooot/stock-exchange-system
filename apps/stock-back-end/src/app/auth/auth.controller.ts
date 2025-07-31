@@ -55,8 +55,8 @@ export class AuthController {
     // 设置httpOnly cookie
     response.cookie('access_token', result.access_token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production', // 生产环境使用HTTPS
-      sameSite: 'strict',
+      secure: false, // 允许HTTP连接，适用于IP访问
+      sameSite: 'lax', // 放宽同站策略，适用于IP访问
       maxAge: 24 * 60 * 60 * 1000, // 24小时
       path: '/',
     });
@@ -74,8 +74,8 @@ export class AuthController {
     // 清除cookie
     response.clearCookie('access_token', {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      secure: false, // 允许HTTP连接，适用于IP访问
+      sameSite: 'lax', // 放宽同站策略，适用于IP访问
       path: '/',
     });
 

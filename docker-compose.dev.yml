@@ -5,9 +5,9 @@ services:
     ports:
       - '5432:5432'
     environment:
-      POSTGRES_USER: ${DATABASE_USERNAME}
-      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
-      POSTGRES_DB: ${DATABASE_NAME}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1123
+      POSTGRES_DB: stock_db
       # 优化PostgreSQL性能
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
     env_file:
@@ -19,7 +19,7 @@ services:
     networks:
       - app-network
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${DATABASE_USERNAME} -d ${DATABASE_NAME}']
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d stock_db']
       interval: 3s
       timeout: 3s
       retries: 3
@@ -47,11 +47,11 @@ services:
       - NODE_ENV=development
       - DATABASE_HOST=postgres
       - DATABASE_PORT=5432
-      - DATABASE_USERNAME=${DATABASE_USERNAME}
-      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
-      - DATABASE_NAME=${DATABASE_NAME}
+      - DATABASE_USERNAME=postgres
+      - DATABASE_PASSWORD=1123
+      - DATABASE_NAME=stock_db
       - DATABASE_SYNC=true
-      - DATABASE_URL=postgresql://${DATABASE_USERNAME}:${DATABASE_PASSWORD}@postgres:5432/${DATABASE_NAME}?schema=public
+      - DATABASE_URL=postgresql://postgres:1123@postgres:5432/stock_db?schema=public
       # 优化Node.js性能
       - NODE_OPTIONS=--max-old-space-size=2048
     volumes:

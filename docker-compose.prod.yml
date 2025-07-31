@@ -24,6 +24,7 @@ services:
   # 后端服务
   stock-back-end:
     image: ${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/${DOCKER_REPO_NAME}:backend-latest
+    platform: linux/amd64
     container_name: stock-back-end
     # 限制运行时资源使用（针对2核2G服务器优化）
     deploy:
@@ -56,6 +57,7 @@ services:
   # 前端服务
   stock-fe:
     image: ${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/${DOCKER_REPO_NAME}:frontend-latest
+    platform: linux/amd64
     container_name: stock-fe
     # 限制运行时资源使用（针对2核2G服务器优化）
     deploy:
@@ -66,10 +68,8 @@ services:
         reservations:
           cpus: '0.4'
           memory: 300M
-    environment:
-      - NODE_ENV=production
-      - NEXT_PUBLIC_BACKEND_HOST=121.199.170.204
-      - NEXT_PUBLIC_BACKEND_PORT=3001
+    env_file:
+    - .env.production
     ports:
       - '3000:3000'
     depends_on:

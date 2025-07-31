@@ -50,8 +50,8 @@ module.exports = {
         /^passport-jwt/,
         /^passport-local/,
         /^passport-strategy/,
-        // 打包 Prisma 相关模块
-        /^@prisma\//,
+        // Prisma 相关模块 - 注意：@prisma/client 需要外部化
+        /^@prisma\/engines/,
         /^class-validator/,
         /^class-transformer/,
         /^reflect-metadata/,
@@ -78,6 +78,8 @@ module.exports = {
       'oracledb': 'commonjs oracledb',
       'tedious': 'commonjs tedious',
       'pg-query-stream': 'commonjs pg-query-stream',
+      // Prisma Client 必须外部化以避免二进制文件问题
+      '@prisma/client': 'commonjs @prisma/client',
       // 微服务相关
       '@nestjs/microservices': 'commonjs @nestjs/microservices',
       'ioredis': 'commonjs ioredis',
