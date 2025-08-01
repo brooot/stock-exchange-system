@@ -97,7 +97,7 @@ services:
           cpus: '0.4'
           memory: 300M
     env_file:
-    - .env.production
+      - .env.production
     ports:
       - '3000:3000'
     depends_on:
