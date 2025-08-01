@@ -64,13 +64,13 @@ export const useWebSocket = () => {
 
     // 监听市场数据更新
     socket.on('marketUpdate', (data: MarketData) => {
-      console.log('Market data received:', data);
+      // console.log('Market data received:', data);
       setMarketData(data);
     });
 
     // 监听交易完成事件
     socket.on('tradeCompleted', (data: TradeData) => {
-      console.log('Trade completed:', data);
+      // console.log('Trade completed:', data);
       setLastTrade(data);
     });
 

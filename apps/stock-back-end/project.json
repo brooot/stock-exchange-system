@@ -40,12 +40,6 @@
       "options": {
         "passWithNoTests": true
       }
-    },
-    "docker-build": {
-      "dependsOn": [
-        "build"
-      ],
-      "command": "docker build -f apps/stock-back-end/Dockerfile.dev . -t stock-back-end"
     }
   }
 }

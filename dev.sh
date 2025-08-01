@@ -73,7 +73,7 @@ echo "🏃 启动服务..."
 docker compose -f docker-compose.dev.yml up -d
 
 echo "⏳ 等待服务启动..."
-sleep 15
+sleep 5
 
 # 检查服务状态
 echo "📊 服务状态:"

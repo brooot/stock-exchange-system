@@ -58,8 +58,9 @@ export const useKlineData = (initialInterval = '1m') => {
 
       // 确保数据按时间戳排序并去重
       const sortedData = data
-        .filter((item, index, arr) => 
-          arr.findIndex(t => t.timestamp === item.timestamp) === index
+        .filter(
+          (item, index, arr) =>
+            arr.findIndex((t) => t.timestamp === item.timestamp) === index
         )
         .sort((a, b) => a.timestamp - b.timestamp);
 
@@ -145,7 +146,7 @@ export const useKlineData = (initialInterval = '1m') => {
   // 处理价格更新事件（用于实时价格显示）
   const handlePriceUpdate = useCallback((priceUpdate: PriceUpdateEvent) => {
     // 这里可以添加实时价格更新的逻辑
-    console.log('价格更新:', priceUpdate);
+    // console.log('价格更新:', priceUpdate);
   }, []);
 
   // 初始化WebSocket连接
@@ -217,7 +218,6 @@ export const useKlineData = (initialInterval = '1m') => {
           credentials: 'include',
         }
       );
-      console.log('===> response: ', response);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
