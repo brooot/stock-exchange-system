@@ -28,6 +28,9 @@ jobs:
     - name: Install dependencies
       run: pnpm install --frozen-lockfile
 
+    - name: Generate Prisma client
+      run: pnpm prisma generate
+
     - name: Run tests
       run: |
         pnpm nx test stock-back-end --passWithNoTests
@@ -69,6 +72,9 @@ jobs:
         port: ${{ secrets.PORT || 22 }}
         script: |
           cd ${{ secrets.PROJECT_PATH || '/opt/stock-exchange-system' }}
+
+          # 拉取最新代码
+          gpr
 
           # 停止现有服务
           docker compose -f docker-compose.prod.yml --env-file .env.production down
