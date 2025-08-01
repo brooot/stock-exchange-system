@@ -87,6 +87,8 @@ services:
     image: ${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/${DOCKER_REPO_NAME}:frontend-latest
     platform: linux/amd64
     container_name: stock-fe
+    environment:
+      - PORT=3000
     # 限制运行时资源使用（针对2核2G服务器优化）
     deploy:
       resources:
