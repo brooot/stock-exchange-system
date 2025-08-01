@@ -77,8 +77,14 @@ services:
       # 优化Node.js性能
       - NODE_OPTIONS=--max-old-space-size=2048
     volumes:
-      # 挂载整个项目目录以确保热重载正常工作
-      - .:/app:cached
+      # 挂载源代码目录以确保热重载正常工作
+      - ./apps/stock-back-end:/app/apps/stock-back-end:cached
+      - ./apps/stock-back-end-e2e:/app/apps/stock-back-end-e2e:cached
+      - ./prisma:/app/prisma:cached
+      - ./package.json:/app/package.json:ro
+      - ./pnpm-lock.yaml:/app/pnpm-lock.yaml:ro
+      - ./nx.json:/app/nx.json:ro
+      - ./tsconfig.base.json:/app/tsconfig.base.json:ro
       # 使用命名卷避免覆盖容器内的关键目录
       - node_modules_cache:/app/node_modules
       - nx_cache:/app/.nx
@@ -93,7 +99,7 @@ services:
         condition: service_started
     # 添加健康检查
     healthcheck:
-      test: ['CMD-SHELL', 'curl -f http://localhost:3001/api/health || exit 1']
+      test: ['CMD-SHELL', 'curl -f http://localhost:3001/api || exit 1']
       interval: 30s
       timeout: 10s
       retries: 3
