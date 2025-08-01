@@ -134,6 +134,25 @@ module.exports = {
       },
     }),
   ],
+  // 忽略已知的 NestJS 动态导入警告
+  ignoreWarnings: [
+    {
+      module: /node_modules\/@nestjs\/common\/utils\/load-package\.util\.js/,
+      message: /Critical dependency: the request of a dependency is an expression/,
+    },
+    {
+      module: /node_modules\/@nestjs\/core\/helpers\/load-adapter\.js/,
+      message: /Critical dependency: the request of a dependency is an expression/,
+    },
+    {
+      module: /node_modules\/@nestjs\/core\/helpers\/optional-require\.js/,
+      message: /Critical dependency: the request of a dependency is an expression/,
+    },
+    {
+      module: /node_modules\/@nestjs\/microservices\/client\/client-grpc\.js/,
+      message: /Critical dependency: the request of a dependency is an expression/,
+    },
+  ],
   watch: process.env.NODE_ENV !== 'production',
   watchOptions: {
     ignored: /node_modules/,
