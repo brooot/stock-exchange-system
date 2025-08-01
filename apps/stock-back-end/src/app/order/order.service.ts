@@ -70,7 +70,7 @@ export class OrderService {
         method,
         price: new Decimal(price),
         quantity,
-        status: 'OPEN',
+        status: OrderStatus.OPEN,
       },
     });
 
@@ -171,14 +171,17 @@ export class OrderService {
       throw new ForbiddenException('无权限取消此订单');
     }
 
-    if (order.status !== 'OPEN' && order.status !== 'PARTIALLY_FILLED') {
+    if (
+      order.status !== OrderStatus.OPEN &&
+      order.status !== OrderStatus.PARTIALLY_FILLED
+    ) {
       throw new BadRequestException('订单状态不允许取消');
     }
 
     // 更新订单状态
     await this.prisma.order.update({
       where: { id: orderId },
-      data: { status: 'CANCELLED' },
+      data: { status: OrderStatus.CANCELLED },
     });
 
     return { success: true };
@@ -197,7 +200,7 @@ export class OrderService {
     const whereCondition: any = {
       symbol, // 同一股票代码
       type: oppositeType,
-      status: { in: ['OPEN', 'PARTIALLY_FILLED'] },
+      status: { in: [OrderStatus.OPEN, OrderStatus.PARTIALLY_FILLED] },
       userId: { not: newOrder.userId }, // 严格禁止自成交
     };
 
@@ -308,8 +311,8 @@ export class OrderService {
             filledQuantity: newOrderFilledQty,
             status:
               newOrderFilledQty >= newOrder.quantity
-                ? 'FILLED'
-                : 'PARTIALLY_FILLED',
+                ? OrderStatus.FILLED
+                : OrderStatus.PARTIALLY_FILLED,
           },
         });
 
@@ -320,8 +323,8 @@ export class OrderService {
             filledQuantity: oppositeOrderFilledQty,
             status:
               oppositeOrderFilledQty >= oppositeOrder.quantity
-                ? 'FILLED'
-                : 'PARTIALLY_FILLED',
+                ? OrderStatus.FILLED
+                : OrderStatus.PARTIALLY_FILLED,
           },
         });
 
@@ -340,10 +343,10 @@ export class OrderService {
 
       const finalStatus =
         filledQuantity >= newOrder.quantity
-          ? 'FILLED'
+          ? OrderStatus.FILLED
           : filledQuantity > 0
-          ? 'PARTIALLY_FILLED'
-          : 'OPEN';
+          ? OrderStatus.PARTIALLY_FILLED
+          : OrderStatus.OPEN;
 
       return {
         filledQuantity,
@@ -431,7 +434,7 @@ export class OrderService {
       await this.positionService.updatePositionOnTrade(
         buyOrder.userId,
         symbol,
-        'BUY',
+        OrderType.BUY,
         quantity,
         price
       );

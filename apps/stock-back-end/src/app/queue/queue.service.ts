@@ -29,11 +29,14 @@ export class QueueService {
   constructor(
     @InjectQueue('order-processing') private orderQueue: Queue,
     @InjectQueue('trade-processing') private tradeQueue: Queue,
-    @InjectQueue('market-data-update') private marketDataQueue: Queue,
+    @InjectQueue('market-data-update') private marketDataQueue: Queue
   ) {}
 
   // 添加订单到处理队列
-  async addOrderToQueue(orderData: OrderQueueData, priority = 0): Promise<void> {
+  async addOrderToQueue(
+    orderData: OrderQueueData,
+    priority = 0
+  ): Promise<void> {
     await this.orderQueue.add('process-order', orderData, {
       priority,
       attempts: 3,
@@ -65,21 +68,29 @@ export class QueueService {
   }
 
   // 添加市场数据更新到队列
-  async addMarketDataUpdate(symbol: string, updateType: string, data: any): Promise<void> {
-    await this.marketDataQueue.add('update-market-data', {
-      symbol,
-      updateType,
-      data,
-      timestamp: Date.now(),
-    }, {
-      attempts: 3,
-      backoff: {
-        type: 'fixed',
-        delay: 500,
+  async addMarketDataUpdate(
+    symbol: string,
+    updateType: string,
+    data: any
+  ): Promise<void> {
+    await this.marketDataQueue.add(
+      'update-market-data',
+      {
+        symbol,
+        updateType,
+        data,
+        timestamp: Date.now(),
       },
-      removeOnComplete: 50,
-      removeOnFail: 25,
-    });
+      {
+        attempts: 3,
+        backoff: {
+          type: 'fixed',
+          delay: 500,
+        },
+        removeOnComplete: 50,
+        removeOnFail: 25,
+      }
+    );
   }
 
   // 获取队列状态
