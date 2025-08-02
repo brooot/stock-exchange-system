@@ -1,11 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserService } from '../user/user.service';
 import { OrderService } from '../order/order.service';
 import { OrderType, OrderMethod } from '@prisma/client';
 
 @Injectable()
-export class BotService {
+export class BotService implements OnModuleInit {
   private readonly logger = new Logger(BotService.name);
   private isRunning = false;
   private intervalId: NodeJS.Timeout | null = null;
@@ -24,6 +24,24 @@ export class BotService {
     private userService: UserService,
     private orderService: OrderService
   ) {}
+
+  /** 模块初始化时自动启动机器人交易 */
+  async onModuleInit() {
+    try {
+      // 延迟启动，确保所有依赖服务都已初始化
+      setTimeout(async () => {
+        this.logger.log('正在自动启动机器人交易系统...');
+        const result = await this.startBotTrading();
+        if (result.success) {
+          this.logger.log('机器人交易系统自动启动成功');
+        } else {
+          this.logger.error('机器人交易系统自动启动失败:', result.message);
+        }
+      }, 5000); // 延迟5秒启动
+    } catch (error) {
+      this.logger.error('机器人交易系统自动启动异常:', error);
+    }
+  }
 
   /** 启动机器人交易 */
   async startBotTrading() {
