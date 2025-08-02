@@ -72,6 +72,7 @@ services:
       - REDIS_HOST=${REDIS_HOST:-redis}
       - REDIS_PORT=${REDIS_PORT:-6379}
       - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - NODE_OPTIONS=--max-old-space-size=512
     ports:
       - '3001:3001'
     depends_on:
@@ -89,6 +90,7 @@ services:
     container_name: stock-fe
     environment:
       - PORT=3000
+      - NODE_OPTIONS=--max-old-space-size=256
     # 限制运行时资源使用（针对2核2G服务器优化）
     deploy:
       resources:
