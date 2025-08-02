@@ -71,7 +71,7 @@ jobs:
         key: ${{ secrets.KEY }}
         port: ${{ secrets.PORT || 22 }}
         script: |
-          cd ${{ secrets.PROJECT_PATH || '/opt/stock-exchange-system' }}
+          cd ${{ secrets.PROJECT_PATH || '/root/projects/stock-exchange-system' }}
 
           # 拉取最新代码
           gpr
