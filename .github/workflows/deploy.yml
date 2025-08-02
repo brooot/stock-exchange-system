@@ -88,6 +88,12 @@ jobs:
           docker pull ${{ secrets.DOCKER_REGISTRY }}/${{ secrets.DOCKER_NAMESPACE }}/${{ secrets.DOCKER_REPO_NAME }}:backend-latest
           docker pull ${{ secrets.DOCKER_REGISTRY }}/${{ secrets.DOCKER_NAMESPACE }}/${{ secrets.DOCKER_REPO_NAME }}:frontend-latest
 
+          # 清理无用的Docker镜像
+          echo "清理无用的Docker镜像..."
+          docker image prune -f
+          # 删除tag为<none>的镜像
+          docker images | grep "<none>" | awk '{print $3}' | xargs -r docker rmi
+
           # 启动服务
           echo "启动服务..."
           docker compose -f docker-compose.prod.yml --env-file .env.production up -d
