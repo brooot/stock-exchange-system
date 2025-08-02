@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { io, Socket } from 'socket.io-client';
 
 // 动态导入 echarts 以避免 SSR 问题
 let echarts: any = null;
-
 
 interface KlineData {
   timestamp: number;
@@ -17,12 +17,24 @@ interface KlineData {
   interval: string;
 }
 
-interface KLineChartProps {
-  data: KlineData[];
+interface KlineUpdateEvent {
   interval: string;
-  onIntervalChange: (interval: string) => void;
-  isLoading?: boolean;
-  getSupportedIntervals?: () => Promise<string[]>;
+  data: KlineData;
+  isNewKline: boolean;
+}
+
+interface PriceUpdateEvent {
+  symbol: string;
+  price: number;
+  volume: number;
+  timestamp: Date;
+  tradeId: number;
+}
+
+interface KLineChartProps {
+  symbol?: string;
+  initialInterval?: string;
+  onIntervalChange?: (interval: string) => void;
 }
 
 const DEFAULT_INTERVALS = [
@@ -81,22 +93,28 @@ const getIntervalLabel = (interval: string): string => {
 };
 
 export default function KLineChart({
-  data,
-  interval,
-  onIntervalChange,
-  isLoading = false,
-  getSupportedIntervals
+  symbol = 'AAPL',
+  initialInterval = '1m',
+  onIntervalChange
 }: KLineChartProps) {
   // DOM引用和图表实例
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstance = useRef<any>(null);
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const socketRef = useRef<Socket | null>(null);
+  const updateThrottleRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingUpdatesRef = useRef<Map<string, KlineData>>(new Map());
 
   // 组件状态
   const [isChartReady, setIsChartReady] = useState(false);
   const [intervals, setIntervals] = useState(DEFAULT_INTERVALS);
   const [intervalsLoading, setIntervalsLoading] = useState(false);
   const [echartsLoaded, setEchartsLoaded] = useState(false);
+  const [currentInterval, setCurrentInterval] = useState(initialInterval);
+  const [klineData, setKlineData] = useState<Record<string, KlineData[]>>({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // 动态加载ECharts库和组件
   useEffect(() => {
@@ -161,15 +179,234 @@ export default function KLineChart({
     loadECharts();
   }, []);
 
+  // 获取K线数据
+  const fetchKlineData = useCallback(async (interval: string) => {
+    if (klineData[interval]) return; // 如果已有数据则不重复获取
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(
+        `http://${process.env.NEXT_PUBLIC_BACKEND_HOST}:${process.env.NEXT_PUBLIC_BACKEND_PORT}/api/kline?symbol=${symbol}&interval=${interval}&limit=100`,
+        {
+          credentials: 'include',
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data: KlineData[] = await response.json();
+
+      // 确保数据按时间戳排序并去重
+      const sortedData = data
+        .filter(
+          (item, index, arr) =>
+            arr.findIndex((t) => t.timestamp === item.timestamp) === index
+        )
+        .sort((a, b) => a.timestamp - b.timestamp);
+
+      setKlineData((prev) => ({
+        ...prev,
+        [interval]: sortedData,
+      }));
+    } catch (err) {
+      console.error('获取K线数据失败:', err);
+      setError(err instanceof Error ? err.message : '获取K线数据失败');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [symbol, klineData]);
+
+  // 节流更新函数
+  const throttledUpdate = useCallback(() => {
+    if (updateThrottleRef.current) {
+      clearTimeout(updateThrottleRef.current);
+    }
+
+    updateThrottleRef.current = setTimeout(() => {
+      const updates = Array.from(pendingUpdatesRef.current.entries());
+      if (updates.length === 0) return;
+
+      setKlineData((prev) => {
+        const newData = { ...prev };
+
+        updates.forEach(([interval, klineUpdate]) => {
+          if (!newData[interval]) {
+            newData[interval] = [];
+          }
+
+          const existingData = [...newData[interval]];
+          const existingIndex = existingData.findIndex(
+            (item) => item.timestamp === klineUpdate.timestamp
+          );
+
+          if (existingIndex >= 0) {
+            // 更新现有K线
+            existingData[existingIndex] = klineUpdate;
+          } else {
+            // 添加新K线，确保不重复添加
+            const isDuplicate = existingData.some(
+              (item) => item.timestamp === klineUpdate.timestamp
+            );
+            if (!isDuplicate) {
+              existingData.push(klineUpdate);
+              existingData.sort((a, b) => a.timestamp - b.timestamp);
+
+              // 保持数据量在合理范围内
+              if (existingData.length > 1000) {
+                existingData.splice(0, existingData.length - 1000);
+              }
+            }
+          }
+
+          newData[interval] = existingData;
+        });
+
+        return newData;
+      });
+
+      // 清空待处理的更新
+      pendingUpdatesRef.current.clear();
+    }, 100); // 100ms 节流
+  }, []);
+
+  // 处理K线更新事件
+  const handleKlineUpdate = useCallback(
+    (updateEvent: KlineUpdateEvent) => {
+      const { interval, data: klineUpdate } = updateEvent;
+
+      // 将更新添加到待处理队列
+      pendingUpdatesRef.current.set(interval, klineUpdate);
+
+      // 触发节流更新
+      throttledUpdate();
+    },
+    [throttledUpdate]
+  );
+
+  // 处理价格更新事件（用于实时价格显示）
+  const handlePriceUpdate = useCallback((priceUpdate: PriceUpdateEvent) => {
+    const { symbol: updateSymbol, price, volume, timestamp } = priceUpdate;
+
+    // 只处理当前股票的价格更新
+    if (updateSymbol !== symbol) return;
+
+    // 更新当前时间周期的最后一根K线数据
+    setKlineData(prevData => {
+      const newData = { ...prevData };
+      const currentData = newData[currentInterval] || [];
+
+      if (currentData.length === 0) return prevData;
+
+      // 获取最后一根K线
+      const lastKline = { ...currentData[currentData.length - 1] };
+      const updateTime = new Date(timestamp).getTime();
+
+      // 判断是否应该更新最后一根K线（基于时间间隔）
+      const intervalMs = getIntervalInMs(currentInterval);
+      const klineStartTime = Math.floor(lastKline.timestamp / intervalMs) * intervalMs;
+      const currentKlineEndTime = klineStartTime + intervalMs;
+
+      // 如果价格更新时间在当前K线时间范围内，则更新最后一根K线
+      if (updateTime >= klineStartTime && updateTime < currentKlineEndTime) {
+        // 更新最后一根K线的数据
+        lastKline.close = price;
+        lastKline.high = Math.max(lastKline.high, price);
+        lastKline.low = Math.min(lastKline.low, price);
+        lastKline.volume += volume; // 累加成交量
+
+        // 替换最后一根K线
+        const updatedData = [...currentData];
+        updatedData[updatedData.length - 1] = lastKline;
+        newData[currentInterval] = updatedData;
+      }
+
+      return newData;
+    });
+  }, [symbol, currentInterval]);
+
+  // 获取时间间隔对应的毫秒数
+  const getIntervalInMs = useCallback((interval: string): number => {
+    const intervalMap: Record<string, number> = {
+      '1m': 60 * 1000,
+      '5m': 5 * 60 * 1000,
+      '15m': 15 * 60 * 1000,
+      '1h': 60 * 60 * 1000,
+      '1d': 24 * 60 * 60 * 1000,
+    };
+    return intervalMap[interval] || 60 * 1000;
+  }, []);
+
+  // 初始化WebSocket连接
+  useEffect(() => {
+    const socket = io(
+      `http://${process.env.NEXT_PUBLIC_BACKEND_HOST}:${process.env.NEXT_PUBLIC_BACKEND_PORT}/market`,
+      {
+        withCredentials: true,
+      }
+    );
+
+    socketRef.current = socket;
+
+    // 连接事件
+    socket.on('connect', () => {
+      console.log('K线数据WebSocket已连接');
+      setIsConnected(true);
+      setError(null);
+    });
+
+    socket.on('disconnect', () => {
+      console.log('K线数据WebSocket已断开');
+      setIsConnected(false);
+    });
+
+    socket.on('connect_error', (err) => {
+      console.error('K线数据WebSocket连接错误:', err);
+      setError('WebSocket连接失败');
+      setIsConnected(false);
+    });
+
+    // K线数据更新事件
+    socket.on('klineUpdate', handleKlineUpdate);
+
+    // 价格更新事件
+    socket.on('priceUpdate', handlePriceUpdate);
+
+    return () => {
+      if (updateThrottleRef.current) {
+        clearTimeout(updateThrottleRef.current);
+      }
+      socket.disconnect();
+    };
+  }, [handleKlineUpdate, handlePriceUpdate]);
+
+  // 当时间周期改变时，获取对应的历史数据
+  useEffect(() => {
+    if (!klineData[currentInterval]) {
+      fetchKlineData(currentInterval);
+    }
+  }, [currentInterval, fetchKlineData]);
+
   // 获取支持的时间周期列表
   useEffect(() => {
     const fetchSupportedIntervals = async () => {
-      if (!getSupportedIntervals) return;
-
       try {
         setIntervalsLoading(true);
-        const supportedList = await getSupportedIntervals();
-        const intervalOptions = supportedList.map(value => ({
+        const response = await fetch(
+          `http://${process.env.NEXT_PUBLIC_BACKEND_HOST}:${process.env.NEXT_PUBLIC_BACKEND_PORT}/api/kline/intervals`,
+          {
+            credentials: 'include',
+          }
+        );
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const intervalOptions = data.intervals.map((value: string) => ({
           value,
           label: getIntervalLabel(value)
         }));
@@ -183,7 +420,13 @@ export default function KLineChart({
     };
 
     fetchSupportedIntervals();
-  }, [getSupportedIntervals]);
+  }, []);
+
+  // 切换时间周期
+  const changeInterval = useCallback((newInterval: string) => {
+    setCurrentInterval(newInterval);
+    onIntervalChange?.(newInterval);
+  }, [onIntervalChange]);
 
   // 初始化ECharts图表实例
   useEffect(() => {
@@ -234,7 +477,9 @@ export default function KLineChart({
 
   // 使用useMemo缓存处理后的图表数据，避免重复计算
   const chartData = useMemo(() => {
-    if (!data || data.length === 0) {
+    const currentData = klineData[currentInterval] || [];
+
+    if (currentData.length === 0) {
       return {
         timestamps: [],
         klineData: [],
@@ -249,10 +494,10 @@ export default function KLineChart({
     }
 
     // 提取时间戳数据
-    const timestamps = data.map(item => item.timestamp);
+    const timestamps = currentData.map(item => item.timestamp);
 
     // 转换K线数据为ECharts candlestick格式 [open, close, low, high]
-    const klineData = data.map(item => [
+    const klineDataArray = currentData.map(item => [
       item.open,
       item.close,
       item.low,
@@ -260,7 +505,7 @@ export default function KLineChart({
     ]);
 
     // 转换成交量数据为ECharts格式 [index, volume, direction]
-    const volumeData = data.map((item, index) => [
+    const volumeData = currentData.map((item, index) => [
       index,
       item.volume,
       item.close >= item.open ? 1 : -1  // 1表示上涨，-1表示下跌
@@ -268,19 +513,19 @@ export default function KLineChart({
 
     // 计算各周期移动平均线
     const movingAverages = {
-      ma5: calculateMovingAverage(5, klineData),
-      ma10: calculateMovingAverage(10, klineData),
-      ma20: calculateMovingAverage(20, klineData),
-      ma30: calculateMovingAverage(30, klineData)
+      ma5: calculateMovingAverage(5, klineDataArray),
+      ma10: calculateMovingAverage(10, klineDataArray),
+      ma20: calculateMovingAverage(20, klineDataArray),
+      ma30: calculateMovingAverage(30, klineDataArray)
     };
 
     return {
       timestamps,
-      klineData,
+      klineData: klineDataArray,
       volumeData,
       movingAverages
     };
-  }, [data]);
+  }, [klineData, currentInterval]);
 
   // 更新图表数据和配置
   useEffect(() => {
@@ -298,8 +543,9 @@ export default function KLineChart({
       // 清除之前的图表内容，防止数据重叠
       chartInstance.current.clear();
 
-      const { timestamps=[], klineData, volumeData, movingAverages } = chartData;
+      const { timestamps = [], klineData, volumeData, movingAverages } = chartData;
       const { ma5, ma10, ma20, ma30 } = movingAverages;
+      const currentData = klineData || [];
 
       // 构建ECharts配置选项
       const chartOption: any = {
@@ -356,7 +602,7 @@ export default function KLineChart({
             type: 'category',
             data: timestamps.map((timestamp: number) => {
               const date = new Date(timestamp);
-              if (interval === '1d') {
+              if (currentInterval === '1d') {
                 return `${date.getMonth() + 1}/${date.getDate()}`;
               } else {
                 return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
@@ -376,7 +622,7 @@ export default function KLineChart({
             gridIndex: 1,
             data: timestamps.map((timestamp: number) => {
               const date = new Date(timestamp);
-              if (interval === '1d') {
+              if (currentInterval === '1d') {
                 return `${date.getMonth() + 1}/${date.getDate()}`;
               } else {
                 return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
@@ -412,7 +658,7 @@ export default function KLineChart({
           {
             type: 'inside',
             xAxisIndex: [0, 1],
-            start: data.length <= 50 ? 0 : Math.max(0, 100 - (100 / data.length) * 50),
+            start: currentData.length <= 50 ? 0 : Math.max(0, 100 - (100 / currentData.length) * 50),
             end: 100
           },
           {
@@ -420,7 +666,7 @@ export default function KLineChart({
             xAxisIndex: [0, 1],
             type: 'slider',
             top: '85%',
-            start: data.length <= 50 ? 0 : Math.max(0, 100 - (100 / data.length) * 50),
+            start: currentData.length <= 50 ? 0 : Math.max(0, 100 - (100 / currentData.length) * 50),
             end: 100
           }
         ],
@@ -431,11 +677,11 @@ export default function KLineChart({
           pieces: [
             {
               value: 1,
-              color: CHART_COLORS.down
+              color: CHART_COLORS.up
             },
             {
               value: -1,
-              color: CHART_COLORS.up
+              color: CHART_COLORS.down
             }
           ]
         },
@@ -518,21 +764,22 @@ export default function KLineChart({
         clearTimeout(updateTimeoutRef.current);
       }
     };
-  }, [chartData, interval, isChartReady]);
+  }, [chartData, currentInterval, isChartReady]);
 
   /**
    * 增量更新最后一根K线数据
    * @param newKlineData 新的K线数据
    */
   const updateLastKline = useCallback((newKlineData: KlineData) => {
-    if (!chartInstance.current || !data.length || !isChartReady) return;
+    const currentData = klineData[currentInterval] || [];
+    if (!chartInstance.current || !currentData.length || !isChartReady) return;
 
-    const lastIndex = data.length - 1;
-    const lastTimestamp = data[lastIndex].timestamp;
+    const lastIndex = currentData.length - 1;
+    const lastTimestamp = currentData[lastIndex].timestamp;
 
     // 只有当新数据与最后一根K线时间戳相同时才进行更新
     if (newKlineData.timestamp === lastTimestamp) {
-      const updatedData = [...data];
+      const updatedData = [...currentData];
       updatedData[lastIndex] = newKlineData;
 
       // 重新格式化K线数据
@@ -572,7 +819,7 @@ export default function KLineChart({
         silent: true
       });
     }
-  }, [data, isChartReady]);
+  }, [klineData, currentInterval, isChartReady]);
 
   // 将更新方法暴露给父组件使用
   useEffect(() => {
@@ -594,10 +841,10 @@ export default function KLineChart({
             intervals.map((intervalOption) => (
               <button
                 key={intervalOption.value}
-                onClick={() => onIntervalChange(intervalOption.value)}
-                className={`px-3 py-1 text-sm rounded transition-colors ${interval === intervalOption.value
-                    ? 'bg-blue-500 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                onClick={() => changeInterval(intervalOption.value)}
+                className={`px-3 py-1 text-sm rounded transition-colors ${currentInterval === intervalOption.value
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
               >
                 {intervalOption.label}
@@ -624,8 +871,22 @@ export default function KLineChart({
         style={{ minHeight: '400px' }}
       />
 
+      {/* 连接状态指示器 */}
+      {!isConnected && (
+        <div className="mb-2 text-sm text-orange-600">
+          ⚠️ WebSocket连接断开，实时数据可能不准确
+        </div>
+      )}
+
+      {/* 错误状态提示 */}
+      {error && (
+        <div className="mb-2 text-sm text-red-600">
+          ❌ {error}
+        </div>
+      )}
+
       {/* 无数据状态提示 */}
-      {!isLoading && echartsLoaded && data.length === 0 && (
+      {!isLoading && echartsLoaded && (klineData[currentInterval] || []).length === 0 && (
         <div className="flex items-center justify-center h-96 text-gray-500">
           <div className="text-center">
             <div className="text-4xl mb-2">📈</div>

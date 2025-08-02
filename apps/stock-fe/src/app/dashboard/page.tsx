@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import Decimal from 'decimal.js';
 import { accountAPI, orderAPI, authAPI, tradeAPI, positionAPI } from '../../utils/api';
 import { useWebSocket } from '../../hooks/useWebSocket';
-import { useKlineData } from '../../hooks/useKlineData';
 import { AccountInfo, PositionTable, MarketData, TradingPanel, BotControl, KLineChart } from '../../components/dashboard';
 
 interface AccountInfo {
@@ -37,7 +36,6 @@ interface MarketData {
 export default function DashboardPage() {
   const router = useRouter();
   const { marketData, lastTrade, isConnected } = useWebSocket();
-  const { klineData, currentInterval, isLoading: klineLoading, changeInterval, getSupportedIntervals } = useKlineData();
 
   const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null);
   const [positions, setPositions] = useState<Position[]>([]);
@@ -142,11 +140,8 @@ export default function DashboardPage() {
           </div>
 
           <KLineChart
-            data={klineData}
-            interval={currentInterval}
-            onIntervalChange={changeInterval}
-            isLoading={klineLoading}
-            getSupportedIntervals={getSupportedIntervals}
+            symbol="AAPL"
+            initialInterval="1m"
           />
 
           <TradingPanel

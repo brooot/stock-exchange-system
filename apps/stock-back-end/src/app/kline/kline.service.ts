@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { MarketGateway } from '../websocket/market.gateway';
 import { KlineInterval } from '@prisma/client';
@@ -31,7 +31,7 @@ interface IntervalConfig {
 }
 
 @Injectable()
-export class KlineService {
+export class KlineService implements OnModuleDestroy {
   // 内存中的K线数据缓存，按时间周期分组
   private klineCache = new Map<string, KlineData[]>();
 
@@ -64,7 +64,7 @@ export class KlineService {
   private currentMinuteData = new Map<
     string,
     {
-      open?: number;
+      open: number;
       high: number;
       low: number;
       close: number;
@@ -72,6 +72,9 @@ export class KlineService {
       timestamp: number;
     }
   >();
+
+  private periodicTaskTimer: NodeJS.Timeout;
+  private cleanupTimer: NodeJS.Timeout;
 
   constructor(
     private prisma: PrismaService,
@@ -181,8 +184,72 @@ export class KlineService {
 
     this.currentMinuteData.set(cacheKey, minuteData);
 
-    // 实时更新缓存和推送
+    // 实时更新1分钟K线
     this.updateCacheAndBroadcast(symbol, minuteData, '1m');
+    
+    // 实时更新所有其他时间周期的K线
+    await this.updateAllIntervalsRealtime(symbol, price, volume, timestampMs);
+  }
+
+  /**
+   * 实时更新所有时间周期的K线数据
+   */
+  private async updateAllIntervalsRealtime(
+    symbol: string,
+    price: number,
+    volume: number,
+    timestampMs: number
+  ) {
+    // 遍历所有时间周期（除了1分钟，已经在上面处理了）
+    for (const [interval, config] of Object.entries(this.intervals)) {
+      if (interval === '1m') continue; // 跳过1分钟，已经处理过了
+
+      const intervalMs = config.ms;
+      const alignedTimestamp = Math.floor(timestampMs / intervalMs) * intervalMs;
+      const cacheKey = `${symbol}_${interval}`;
+      
+      // 获取当前缓存的K线数据
+      const cachedData = this.klineCache.get(cacheKey) || [];
+      
+      // 查找当前时间周期的K线数据
+      let currentKline = cachedData.find(k => k.timestamp === alignedTimestamp);
+      
+      if (!currentKline) {
+        // 如果不存在，创建新的K线数据
+        currentKline = {
+          timestamp: alignedTimestamp,
+          open: price,
+          high: price,
+          low: price,
+          close: price,
+          volume: volume,
+          symbol,
+          interval,
+        };
+        cachedData.push(currentKline);
+        cachedData.sort((a, b) => a.timestamp - b.timestamp);
+      } else {
+        // 更新现有的K线数据
+        currentKline.high = Math.max(currentKline.high, price);
+        currentKline.low = Math.min(currentKline.low, price);
+        currentKline.close = price;
+        currentKline.volume += volume;
+      }
+      
+      // 保持数据量在合理范围内
+      if (cachedData.length > 1000) {
+        cachedData.splice(0, cachedData.length - 1000);
+      }
+      
+      this.klineCache.set(cacheKey, cachedData);
+      
+      // 广播更新
+      this.marketGateway.server.emit('klineUpdate', {
+        interval,
+        data: currentKline,
+        isNewKline: cachedData[cachedData.length - 1] === currentKline && currentKline.volume === volume,
+      });
+    }
   }
 
   /**
@@ -341,11 +408,11 @@ export class KlineService {
    */
   private updateCacheAndBroadcast(
     symbol: string,
-    klineData: any,
+    klineData: Omit<KlineData, 'symbol' | 'interval'>,
     interval: string
   ) {
     const cacheKey = `${symbol}_${interval}`;
-    let cachedData = this.klineCache.get(cacheKey) || [];
+    const cachedData = this.klineCache.get(cacheKey) || [];
 
     // 查找或创建K线数据
     const existingIndex = cachedData.findIndex(
@@ -370,7 +437,7 @@ export class KlineService {
 
       // 保持数据量在合理范围内
       if (cachedData.length > 1000) {
-        cachedData = cachedData.slice(-1000);
+        cachedData.splice(0, cachedData.length - 1000);
       }
     }
 
@@ -407,21 +474,26 @@ export class KlineService {
    */
   private startPeriodicTasks() {
     // 每分钟检查并保存当前分钟的数据
-    setInterval(async () => {
+    this.periodicTaskTimer = setInterval(async () => {
       const now = Date.now();
       const currentMinute = Math.floor(now / (60 * 1000)) * (60 * 1000);
 
       for (const [key, minuteData] of this.currentMinuteData.entries()) {
         if (minuteData.timestamp < currentMinute) {
           const symbol = key.replace('_minute', '');
-          await this.saveBaseKline(symbol, minuteData);
-          this.currentMinuteData.delete(key);
+          try {
+            await this.saveBaseKline(symbol, minuteData);
+          } catch (error) {
+            console.error(`处理分钟数据失败: ${key}`, error);
+          } finally {
+            this.currentMinuteData.delete(key);
+          }
         }
       }
     }, 60 * 1000); // 每分钟执行
 
     // 每小时清理过期数据
-    setInterval(() => {
+    this.cleanupTimer = setInterval(() => {
       this.cleanupExpiredData();
     }, 60 * 60 * 1000);
   }
@@ -430,11 +502,37 @@ export class KlineService {
    * 清理过期的K线数据
    */
   private cleanupExpiredData() {
+    console.log('开始清理过期的K线缓存数据...');
     const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
 
     for (const [key, klineData] of this.klineCache.entries()) {
-      const filteredData = klineData.filter((k) => k.timestamp > oneDayAgo);
-      this.klineCache.set(key, filteredData);
+      const originalSize = klineData.length;
+      const firstValidIndex = klineData.findIndex(
+        (k) => k.timestamp > oneDayAgo
+      );
+
+      if (firstValidIndex > 0) {
+        klineData.splice(0, firstValidIndex);
+        console.log(
+          `清理了 ${key} 的缓存，从 ${originalSize} 条减少到 ${klineData.length} 条`
+        );
+      } else if (firstValidIndex === -1 && originalSize > 0) {
+        this.klineCache.set(key, []);
+        console.log(
+          `清理了 ${key} 的缓存，所有 ${originalSize} 条数据均已过期`
+        );
+      }
+    }
+    console.log('过期的K线缓存数据清理完成。');
+  }
+
+  onModuleDestroy() {
+    console.log('KlineService 销毁，清理定时器...');
+    if (this.periodicTaskTimer) {
+      clearInterval(this.periodicTaskTimer);
+    }
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
     }
   }
 }
