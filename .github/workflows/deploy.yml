@@ -74,7 +74,8 @@ jobs:
           cd ${{ secrets.PROJECT_PATH || '/root/projects/stock-exchange-system' }}
 
           # 拉取最新代码
-          gpr
+          pwd
+          git pull --rebase
 
           # 停止现有服务
           docker compose -f docker-compose.prod.yml --env-file .env.production down
