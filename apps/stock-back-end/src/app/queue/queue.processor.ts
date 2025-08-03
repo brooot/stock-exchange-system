@@ -18,7 +18,7 @@ export class OrderProcessor {
     const { userId, symbol, type, method, price, quantity, orderId } = job.data;
 
     try {
-      this.logger.debug(`Processing order ${orderId} for user ${userId}`);
+      // this.logger.debug(`Processing order ${orderId} for user ${userId}`);
 
       // 处理订单撮合
       const result = await this.orderService.createOrderSync(
@@ -30,9 +30,9 @@ export class OrderProcessor {
         quantity
       );
 
-      this.logger.debug(
-        `Order ${orderId} processed successfully: ${JSON.stringify(result)}`
-      );
+      // this.logger.debug(
+      //   `Order ${orderId} processed successfully: ${JSON.stringify(result)}`
+      // );
 
       return result;
     } catch (error) {

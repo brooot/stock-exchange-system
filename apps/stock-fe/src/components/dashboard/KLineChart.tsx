@@ -92,7 +92,7 @@ const getIntervalLabel = (interval: string): string => {
   return INTERVAL_LABELS[interval] || interval;
 };
 
-export default function KLineChart({
+const KLineChart = React.memo(function KLineChart({
   symbol = 'AAPL',
   initialInterval = '1m',
   onIntervalChange
@@ -897,4 +897,13 @@ export default function KLineChart({
       )}
     </div>
   );
-}
+}, (prevProps, nextProps) => {
+  // 自定义比较函数，优化React.memo性能
+  return (
+    prevProps.symbol === nextProps.symbol &&
+    prevProps.initialInterval === nextProps.initialInterval &&
+    prevProps.onIntervalChange === nextProps.onIntervalChange
+  );
+});
+
+export default KLineChart;

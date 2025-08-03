@@ -16,6 +16,9 @@ import { InjectQueue } from '@nestjs/bull';
 
 @Injectable()
 export class OrderService {
+  // 缓存上一次的市场价格，避免重复广播相同价格
+  private lastMarketPrices: Map<string, number> = new Map();
+
   constructor(
     private prisma: PrismaService,
     private userService: UserService,
@@ -458,6 +461,16 @@ export class OrderService {
     });
 
     const latestPrice = latestTrade ? latestTrade.price.toNumber() : 150.0;
+
+    // 检查价格是否与上次相同，如果相同则跳过广播
+    const lastPrice = this.lastMarketPrices.get(symbol);
+    if (lastPrice !== undefined && lastPrice === latestPrice) {
+      // 价格未变化，跳过广播
+      return;
+    }
+
+    // 更新缓存的价格
+    this.lastMarketPrices.set(symbol, latestPrice);
 
     // 计算今日开盘价（简化实现，使用当日第一笔交易价格）
     const todayStart = new Date();

@@ -145,28 +145,28 @@ export default function DashboardPage() {
           />
 
           <TradingPanel
-             marketData={marketData}
-             onCreateOrder={async (orderData) => {
-               setLoading(true);
-               setError('');
-               setSuccess('');
+            marketData={marketData}
+            onCreateOrder={async (orderData) => {
+              setLoading(true);
+              setError('');
+              setSuccess('');
 
-               try {
-                 await orderAPI.createOrder(orderData);
-                 setSuccess('订单提交成功！');
-                 fetchAccountInfo();
-                 fetchPositions();
-               } catch (err: any) {
-                 const errorMessage = err.response?.data?.message || '订单提交失败';
-                 setError(errorMessage);
-               } finally {
-                 setLoading(false);
-               }
-             }}
-             isLoading={loading}
-             error={error}
-             success={success}
-           />
+              try {
+                await orderAPI.createOrder(orderData);
+                setSuccess('订单提交成功！');
+                fetchAccountInfo();
+                fetchPositions();
+              } catch (err: any) {
+                const errorMessage = err.response?.data?.message || '订单提交失败';
+                setError(errorMessage);
+              } finally {
+                setLoading(false);
+              }
+            }}
+            isLoading={loading}
+            error={error}
+            success={success}
+          />
         </div>
       </div>
     </div>

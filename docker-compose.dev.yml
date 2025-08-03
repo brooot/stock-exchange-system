@@ -75,7 +75,7 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       # 优化Node.js性能
-      - NODE_OPTIONS=--max-old-space-size=2048
+      - NODE_OPTIONS=--max-old-space-size=512
     volumes:
       # 挂载源代码目录以确保热重载正常工作
       - ./apps/stock-back-end:/app/apps/stock-back-end:cached
@@ -108,9 +108,11 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1G
+          cpus: '1.0'
+          memory: 600M
         reservations:
-          memory: 512M
+          cpus: '0.4'
+          memory: 300M
     # 启用init进程
     init: true
 
