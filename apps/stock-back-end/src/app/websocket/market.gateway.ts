@@ -49,7 +49,7 @@ export class MarketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   broadcastPriceUpdate(priceData: any) {
     this.server.emit('priceUpdate', priceData);
     this.logger.log(
-      `Price update broadcasted to all clients, symbol: ${priceData.symbol}, price: ${priceData.price}`
+      `Price updated, symbol: ${priceData.symbol}, price: ${priceData.price}`
     );
   }
 

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
-import { OrderType, OrderMethod } from '@prisma/client';
+import { OrderType, OrderMethod, Trade } from '@prisma/client';
 
 export interface OrderQueueData {
   userId: number;
@@ -14,13 +14,14 @@ export interface OrderQueueData {
   timestamp: number;
 }
 
-export interface TradeProcessingData {
-  tradeId: number;
-  buyOrderId: string;
-  sellOrderId: string;
-  price: number;
-  quantity: number;
+// BatchTradeProcessingData 使用 Prisma 的 Trade 类型简化，确保与数据库模型一致
+export interface BatchTradeProcessingData {
+  trades: (Omit<
+    Pick<Trade, 'id' | 'buyOrderId' | 'sellOrderId' | 'price' | 'quantity'>,
+    'price'
+  > & { price: number })[];
   symbol: string;
+  totalVolume: number;
   timestamp: number;
 }
 
@@ -54,9 +55,11 @@ export class QueueService {
     await this.addOrderToQueue(orderData, 10);
   }
 
-  // 添加交易处理到队列
-  async addTradeProcessing(tradeData: TradeProcessingData): Promise<void> {
-    await this.tradeQueue.add('process-trade', tradeData, {
+  // 批量添加交易处理到队列
+  async addBatchTradeProcessing(
+    batchTradeData: BatchTradeProcessingData
+  ): Promise<void> {
+    await this.tradeQueue.add('process-batch-trade', batchTradeData, {
       attempts: 5,
       backoff: {
         type: 'exponential',

@@ -20,6 +20,7 @@ interface TradeData {
   quantity: number;
   timestamp: Date;
   tradeId: string;
+  batchSize?: number; // 批量交易的数量，单个交易时为undefined
 }
 
 export const useWebSocket = () => {

@@ -44,5 +44,5 @@ exec dumb-init nodemon \
      --ignore "**/*.spec.ts" \
      --ignore "**/node_modules" \
      --ignore "**/.nx" \
-     --delay "3000ms" \
+     --delay "8000ms" \
      --exec "cd /app && nx build stock-back-end && node dist/apps/stock-back-end/main.js"

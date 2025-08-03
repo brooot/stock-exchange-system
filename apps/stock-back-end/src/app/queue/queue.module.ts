@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { BullModule } from '@nestjs/bull';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { QueueService } from './queue.service';
@@ -57,7 +57,7 @@ import { KlineModule } from '../kline/kline.module';
       },
     ),
     // 导入依赖模块
-    OrderModule,
+    forwardRef(() => OrderModule),
     WebsocketModule,
     KlineModule,
   ],

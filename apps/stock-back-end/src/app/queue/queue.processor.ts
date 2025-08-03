@@ -4,7 +4,7 @@ import { Job } from 'bull';
 import { OrderService } from '../order/order.service';
 import { MarketGateway } from '../websocket/market.gateway';
 import { KlineService } from '../kline/kline.service';
-import { OrderQueueData, TradeProcessingData } from './queue.service';
+import { OrderQueueData, BatchTradeProcessingData } from './queue.service';
 
 @Processor('order-processing')
 @Injectable()
@@ -52,44 +52,54 @@ export class TradeProcessor {
     private klineService: KlineService
   ) {}
 
-  @Process('process-trade')
-  async processTrade(job: Job<TradeProcessingData>) {
-    const { tradeId, buyOrderId, sellOrderId, price, quantity, symbol } =
-      job.data;
+  @Process('process-batch-trade')
+  async processBatchTrade(job: Job<BatchTradeProcessingData>) {
+    const { trades, symbol, totalVolume, timestamp } = job.data;
 
     try {
-      this.logger.debug(`Processing trade ${tradeId}`);
+      // this.logger.debug(
+      //   `Processing batch trade for ${symbol} with ${trades.length} trades`
+      // );
 
-      // 广播交易完成事件
+      // 计算加权平均价格
+      const totalValue = trades.reduce(
+        (sum, trade) => sum + trade.price * trade.quantity,
+        0
+      );
+      const avgPrice = totalValue / totalVolume;
+
+      // 广播批量交易完成事件（只广播一次汇总信息）
       this.marketGateway.broadcastTradeCompleted({
         symbol,
-        price,
-        quantity,
-        timestamp: new Date(),
-        tradeId,
+        price: avgPrice,
+        quantity: totalVolume,
+        timestamp: new Date(timestamp),
+        tradeId: trades[0].id, // 使用第一个交易的ID作为代表
+        batchSize: trades.length,
       });
 
-      // 触发K线数据更新
+      // 触发K线数据更新（使用最后一个交易的价格）
+      const lastTrade = trades[trades.length - 1];
       await this.klineService.handlePriceUpdate({
         symbol,
-        price,
-        volume: quantity,
-        timestamp: new Date(),
-        tradeId,
+        price: lastTrade.price,
+        volume: totalVolume,
+        timestamp: new Date(timestamp),
+        tradeId: lastTrade.id,
       });
 
-      // 广播价格更新事件
+      // 广播价格更新事件（使用最后一个交易的价格）
       this.marketGateway.broadcastPriceUpdate({
         symbol,
-        price,
-        volume: quantity,
-        timestamp: new Date(),
-        tradeId,
+        price: lastTrade.price,
+        volume: totalVolume,
+        timestamp: new Date(timestamp),
+        tradeId: lastTrade.id,
       });
 
-      this.logger.debug(`Trade ${tradeId} processed successfully`);
+      // this.logger.debug(`Batch trade for ${symbol} processed successfully`);
     } catch (error) {
-      this.logger.error(`Failed to process trade ${tradeId}:`, error);
+      this.logger.error(`Failed to process batch trade for ${symbol}:`, error);
       throw error;
     }
   }
@@ -100,7 +110,10 @@ export class TradeProcessor {
 export class MarketDataProcessor {
   private readonly logger = new Logger(MarketDataProcessor.name);
 
-  constructor(private marketGateway: MarketGateway) {}
+  constructor(
+    private marketGateway: MarketGateway,
+    private orderService: OrderService
+  ) {}
 
   @Process('update-market-data')
   async updateMarketData(
@@ -109,7 +122,7 @@ export class MarketDataProcessor {
     const { symbol, updateType, data } = job.data;
 
     try {
-      this.logger.debug(`Updating market data for ${symbol}: ${updateType}`);
+      // this.logger.debug(`Updating market data for ${symbol}: ${updateType}`);
 
       switch (updateType) {
         case 'price':
@@ -119,7 +132,8 @@ export class MarketDataProcessor {
           this.marketGateway.broadcastMarketUpdate(data);
           break;
         case 'market':
-          this.marketGateway.broadcastMarketUpdate(data);
+          // 调用OrderService的broadcastMarketDataUpdate方法
+          await this.orderService.broadcastMarketDataUpdate(symbol);
           break;
         default:
           this.logger.warn(`Unknown market data update type: ${updateType}`);

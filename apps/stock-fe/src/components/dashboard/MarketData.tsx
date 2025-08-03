@@ -16,6 +16,7 @@ interface MarketData {
 interface LastTrade {
   price: number;
   quantity: number;
+  batchSize?: number;
 }
 
 interface MarketDataProps {
@@ -89,6 +90,9 @@ export default function MarketDataComponent({ marketData, lastTrade, isConnected
             {lastTrade && (
               <div className="text-xs text-green-600 mt-2">
                 最新交易: ${lastTrade.price.toFixed(2)} × {lastTrade.quantity}
+                {lastTrade.batchSize && lastTrade.batchSize > 1 && (
+                  <span className="ml-2 text-blue-600">(批量: {lastTrade.batchSize}笔)</span>
+                )}
               </div>
             )}
           </div>

@@ -9,7 +9,8 @@ import { UserService } from '../user/user.service';
 import { PositionService } from '../position/position.service';
 import { MarketGateway } from '../websocket/market.gateway';
 import { KlineService } from '../kline/kline.service';
-import { OrderType, OrderStatus, OrderMethod } from '@prisma/client';
+import { QueueService, BatchTradeProcessingData } from '../queue/queue.service';
+import { OrderType, OrderStatus, OrderMethod, Trade } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { Queue } from 'bull';
 import { InjectQueue } from '@nestjs/bull';
@@ -25,6 +26,7 @@ export class OrderService {
     private positionService: PositionService,
     private marketGateway: MarketGateway,
     private klineService: KlineService,
+    private queueService: QueueService,
     @InjectQueue('order-processing') private orderQueue: Queue,
     @InjectQueue('trade-processing') private tradeQueue: Queue
   ) {}
@@ -197,7 +199,16 @@ export class OrderService {
     let filledQuantity = 0;
     let remainingQuantity = newOrder.quantity;
     const symbol = newOrder.symbol;
-    const trades: any[] = [];
+    interface TradeInfo {
+      trade: Trade;
+      price: number;
+      quantity: number;
+      symbol: string;
+      buyOrderId?: string;
+      sellOrderId?: string;
+    }
+    
+    const trades: TradeInfo[] = [];
 
     // 查找对手盘订单
     const whereCondition: any = {
@@ -358,39 +369,36 @@ export class OrderService {
       };
     });
 
-    // 事务完成后进行广播操作
-    for (const tradeInfo of result.trades) {
-      // 广播交易完成事件
-      this.marketGateway.broadcastTradeCompleted({
-        symbol: tradeInfo.symbol,
-        price: tradeInfo.price,
-        quantity: tradeInfo.quantity,
-        timestamp: new Date(),
-        tradeId: tradeInfo.trade.id,
-      });
-
-      // 触发K线数据更新
-      await this.klineService.handlePriceUpdate({
-        symbol: tradeInfo.symbol,
-        price: tradeInfo.price,
-        volume: tradeInfo.quantity,
-        timestamp: new Date(),
-        tradeId: tradeInfo.trade.id,
-      });
-
-      // 广播价格更新事件
-      this.marketGateway.broadcastPriceUpdate({
-        symbol: tradeInfo.symbol,
-        price: tradeInfo.price,
-        volume: tradeInfo.quantity,
-        timestamp: new Date(),
-        tradeId: tradeInfo.trade.id,
-      });
-    }
-
-    // 如果有交易发生，广播市场数据更新
-    if (result.filledQuantity > 0) {
-      await this.broadcastMarketDataUpdate(symbol);
+    // 事务完成后批量处理交易广播
+    if (result.trades.length > 0) {
+      // 批量添加交易到处理队列，避免重复广播
+      const batchTradeData: BatchTradeProcessingData = {
+        trades: result.trades.map(tradeInfo => ({
+          id: tradeInfo.trade.id,
+          buyOrderId: tradeInfo.trade.buyOrderId,
+          sellOrderId: tradeInfo.trade.sellOrderId,
+          price: tradeInfo.trade.price.toNumber(),
+          quantity: tradeInfo.trade.quantity,
+        })),
+        symbol,
+        totalVolume: result.filledQuantity,
+        timestamp: Date.now(),
+      };
+      
+      // 添加批量交易处理到队列
+      await this.queueService.addBatchTradeProcessing(batchTradeData);
+      
+      // 添加市场数据更新到队列（一次撮合只需要一次市场数据更新）
+      await this.queueService.addMarketDataUpdate(
+        symbol,
+        'market',
+        {
+          symbol,
+          price: result.trades[result.trades.length - 1]?.price || newOrder.price,
+          volume: result.filledQuantity,
+          timestamp: Date.now(),
+        }
+      );
     }
 
     return {
@@ -453,7 +461,7 @@ export class OrderService {
   }
 
   /** 广播市场数据更新 */
-  private async broadcastMarketDataUpdate(symbol: string) {
+  async broadcastMarketDataUpdate(symbol: string) {
     // 获取最新成交价格（使用最后一次交易的价格）
     const latestTrade = await this.prisma.trade.findFirst({
       orderBy: { executedAt: 'desc' },

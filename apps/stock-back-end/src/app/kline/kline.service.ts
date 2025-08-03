@@ -149,6 +149,7 @@ export class KlineService implements OnModuleDestroy {
   /**
    * 处理新的价格更新
    */
+  //  TODO 如果一直没有新的交易产生，但是K线图的数据还是要更新的，这个是否还没处理？
   async handlePriceUpdate(priceUpdate: PriceUpdateData) {
     const { symbol, price, volume, timestamp } = priceUpdate;
     const timestampMs = new Date(timestamp).getTime();
@@ -186,7 +187,7 @@ export class KlineService implements OnModuleDestroy {
 
     // 实时更新1分钟K线
     this.updateCacheAndBroadcast(symbol, minuteData, '1m');
-    
+
     // 实时更新所有其他时间周期的K线
     await this.updateAllIntervalsRealtime(symbol, price, volume, timestampMs);
   }
@@ -205,15 +206,18 @@ export class KlineService implements OnModuleDestroy {
       if (interval === '1m') continue; // 跳过1分钟，已经处理过了
 
       const intervalMs = config.ms;
-      const alignedTimestamp = Math.floor(timestampMs / intervalMs) * intervalMs;
+      const alignedTimestamp =
+        Math.floor(timestampMs / intervalMs) * intervalMs;
       const cacheKey = `${symbol}_${interval}`;
-      
+
       // 获取当前缓存的K线数据
       const cachedData = this.klineCache.get(cacheKey) || [];
-      
+
       // 查找当前时间周期的K线数据
-      let currentKline = cachedData.find(k => k.timestamp === alignedTimestamp);
-      
+      let currentKline = cachedData.find(
+        (k) => k.timestamp === alignedTimestamp
+      );
+
       if (!currentKline) {
         // 如果不存在，创建新的K线数据
         currentKline = {
@@ -235,19 +239,21 @@ export class KlineService implements OnModuleDestroy {
         currentKline.close = price;
         currentKline.volume += volume;
       }
-      
+
       // 保持数据量在合理范围内
       if (cachedData.length > 1000) {
         cachedData.splice(0, cachedData.length - 1000);
       }
-      
+
       this.klineCache.set(cacheKey, cachedData);
-      
+
       // 广播更新
       this.marketGateway.server.emit('klineUpdate', {
         interval,
         data: currentKline,
-        isNewKline: cachedData[cachedData.length - 1] === currentKline && currentKline.volume === volume,
+        isNewKline:
+          cachedData[cachedData.length - 1] === currentKline &&
+          currentKline.volume === volume,
       });
     }
   }
@@ -278,15 +284,13 @@ export class KlineService implements OnModuleDestroy {
         update: klineData,
         create: klineData,
       });
-
-      // 触发高级周期聚合
-      await this.aggregateHigherIntervals(symbol, minuteData.timestamp);
-
       console.log(
         `保存1分钟K线: ${symbol} ${new Date(
           minuteData.timestamp
         ).toISOString()}`
       );
+      // 触发高级周期聚合
+      await this.aggregateHigherIntervals(symbol, minuteData.timestamp);
     } catch (error) {
       console.error('保存基础K线失败:', error);
     }
