@@ -14,7 +14,7 @@ export class BotService implements OnModuleInit {
   // 配置参数
   private readonly BOT_COUNT = 10; // 机器人数量
   private readonly TRADE_INTERVAL = 1000; // 交易间隔（毫秒）
-  private readonly PRICE_VARIANCE = 1; // 价格波动范围（100%）
+  private readonly PRICE_VARIANCE = 0.5; // 价格波动范围（50%，减少极端价格偏离）
   private readonly ORDER_TIMEOUT = 1000000; // 订单超时时间 ms
   private readonly MIN_ORDER_SIZE = 1; // 最小订单数量
   private readonly MAX_ORDER_SIZE = 100; // 最大订单数量（减小以增加交易频率）
@@ -182,8 +182,8 @@ export class BotService implements OnModuleInit {
 
       // 为每个机器人生成交易决策
       for (const botUserId of this.botUsers) {
-        if (Math.random() < 0.6) {
-          // 60% 概率进行交易（提高交易频率）
+        if (Math.random() < 0.4) {
+          // 40% 概率进行交易（降低交易频率，减少价格冲击）
           await this.generateBotOrder(botUserId, currentPrice);
         }
       }
@@ -259,20 +259,27 @@ export class BotService implements OnModuleInit {
         // 两种操作都可以时，使用更平衡的策略
         let buyProbability = 0.5;
 
-        // 基于持仓调整概率
-        if (holdingQuantity > 200) {
-          buyProbability = 0.3; // 持仓多时倾向卖出
-        } else if (holdingQuantity < 100) {
-          buyProbability = 0.7; // 持仓少时倾向买入
+        // 基于持仓调整概率 - 更激进的平衡策略
+        if (holdingQuantity > 150) {
+          buyProbability = 0.2; // 持仓多时强烈倾向卖出
+        } else if (holdingQuantity < 150) {
+          buyProbability = 0.6; // 持仓少时适度倾向买入
         }
 
-        // 基于盈亏调整概率
+        // 基于盈亏调整概率 - 增强盈利卖出倾向
         const profitRatio = currentPrice / avgCost;
-        if (profitRatio > 1.03) {
-          buyProbability -= 0.2; // 盈利时倾向卖出
-        } else if (profitRatio < 0.97) {
-          buyProbability += 0.2; // 亏损时倾向买入
+        if (profitRatio > 1.05) {
+          buyProbability -= 0.4; // 盈利5%以上时强烈倾向卖出
+        } else if (profitRatio > 1.02) {
+          buyProbability -= 0.3; // 盈利2%以上时倾向卖出
+        } else if (profitRatio < 0.95) {
+          buyProbability += 0.3; // 亏损5%以上时倾向买入
+        } else if (profitRatio < 0.98) {
+          buyProbability += 0.1; // 轻微亏损时略微倾向买入
         }
+
+        // 确保概率在合理范围内
+        buyProbability = Math.max(0.1, Math.min(0.9, buyProbability));
 
         orderType =
           Math.random() < buyProbability ? OrderType.BUY : OrderType.SELL;
@@ -356,8 +363,8 @@ export class BotService implements OnModuleInit {
     quantity: number | null;
     orderMethod: OrderMethod;
   } {
-    // 10%概率使用市价单
-    const useMarketPrice = Math.random() < 0.1;
+    // 25%概率使用市价单（增加市价单比例，促进价格发现）
+    const useMarketPrice = Math.random() < 0.25;
 
     if (useMarketPrice) {
       // 市价单：使用当前价格，数量较小
