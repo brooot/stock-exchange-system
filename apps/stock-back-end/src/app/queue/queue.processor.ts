@@ -20,14 +20,15 @@ export class OrderProcessor {
     try {
       // this.logger.debug(`Processing order ${orderId} for user ${userId}`);
 
-      // 处理订单撮合
+      // 处理订单撮合（传递orderId确保使用相同的订单ID）
       const result = await this.orderService.createOrderSync(
         userId,
         symbol,
         type,
         method,
         price,
-        quantity
+        quantity,
+        orderId
       );
 
       // this.logger.debug(

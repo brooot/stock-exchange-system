@@ -10,10 +10,11 @@ import { PositionService } from '../position/position.service';
 import { MarketGateway } from '../websocket/market.gateway';
 import { KlineService } from '../kline/kline.service';
 import { QueueService, BatchTradeProcessingData } from '../queue/queue.service';
-import { OrderType, OrderStatus, OrderMethod, Trade } from '@prisma/client';
-import { Decimal } from '@prisma/client/runtime/library';
-import { Queue } from 'bull';
 import { InjectQueue } from '@nestjs/bull';
+import { Queue } from 'bull';
+import { OrderType, OrderMethod, OrderStatus, Trade } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class OrderService {
@@ -66,20 +67,10 @@ export class OrderService {
       }
     }
 
-    // 创建订单
-    const order = await this.prisma.order.create({
-      data: {
-        userId,
-        symbol,
-        type,
-        method,
-        price: new Decimal(price),
-        quantity,
-        status: OrderStatus.OPEN,
-      },
-    });
+    // 生成订单ID用于追踪
+    const orderId = randomUUID();
 
-    // 添加到队列进行异步处理
+    // 添加到队列进行异步处理（不在这里创建订单）
     const priority = method === OrderMethod.MARKET ? 10 : 0; // 市价单优先级更高
     await this.orderQueue.add(
       'process-order',
@@ -90,14 +81,14 @@ export class OrderService {
         method,
         price,
         quantity,
-        orderId: order.id,
+        orderId,
         timestamp: Date.now(),
       },
       { priority }
     );
 
     return {
-      id: order.id,
+      id: orderId,
       status: 'PENDING', // 订单已提交，等待处理
       message: '订单已提交，正在处理中',
     };
@@ -110,7 +101,8 @@ export class OrderService {
     type: OrderType,
     method: OrderMethod,
     price: number,
-    quantity: number
+    quantity: number,
+    orderId?: string
   ) {
     // 验证输入
     if (price <= 0 || quantity <= 0) {
@@ -138,16 +130,17 @@ export class OrderService {
       }
     }
 
-    // 创建订单
+    // 创建订单（使用传入的orderId或生成新的）
     const order = await this.prisma.order.create({
       data: {
+        id: orderId || randomUUID(),
         userId,
         symbol,
         type,
         method,
         price: new Decimal(price),
         quantity,
-        status: 'OPEN',
+        status: OrderStatus.OPEN,
       },
     });
 

@@ -36,7 +36,9 @@ export class MarketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // 广播市场数据更新
   broadcastMarketUpdate(marketData: any) {
     this.server.emit('marketUpdate', marketData);
-    // this.logger.log('Market data broadcasted to all clients');
+    this.logger.log(
+      `市场数据更新：symbol: ${marketData.symbol}, price: ${marketData.price}`
+    );
   }
 
   // 广播交易完成事件
@@ -48,9 +50,9 @@ export class MarketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // 广播价格更新事件（用于K线实时更新）
   broadcastPriceUpdate(priceData: any) {
     this.server.emit('priceUpdate', priceData);
-    this.logger.log(
-      `Price updated, symbol: ${priceData.symbol}, price: ${priceData.price}`
-    );
+    // this.logger.log(
+    //   `Price updated, symbol: ${priceData.symbol}, price: ${priceData.price}`
+    // );
   }
 
   // 广播K线数据更新

@@ -19,6 +19,14 @@ export class BotService implements OnModuleInit {
   private readonly MIN_ORDER_SIZE = 1; // 最小订单数量
   private readonly MAX_ORDER_SIZE = 100; // 最大订单数量（减小以增加交易频率）
 
+  // 资金和持仓管理配置
+  private readonly MIN_BALANCE_THRESHOLD = 1000; // 最低资金阈值
+  private readonly MIN_POSITION_THRESHOLD = 10; // 最低持仓阈值
+  private readonly BALANCE_REFILL_AMOUNT = 50000; // 资金补充金额
+  private readonly HEALTH_CHECK_INTERVAL = 60000; // 健康检查间隔（1分钟）
+
+  private healthCheckIntervalId: NodeJS.Timeout | null = null;
+
   constructor(
     private prisma: PrismaService,
     private userService: UserService,
@@ -61,6 +69,11 @@ export class BotService implements OnModuleInit {
         await this.executeBotTradingCycle();
       }, this.TRADE_INTERVAL);
 
+      // 启动健康检查
+      this.healthCheckIntervalId = setInterval(async () => {
+        await this.performHealthCheck();
+      }, this.HEALTH_CHECK_INTERVAL);
+
       this.logger.log('机器人交易系统已启动');
       return { success: true, message: '机器人交易系统已启动' };
     } catch (error) {
@@ -80,6 +93,11 @@ export class BotService implements OnModuleInit {
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
+    }
+
+    if (this.healthCheckIntervalId) {
+      clearInterval(this.healthCheckIntervalId);
+      this.healthCheckIntervalId = null;
     }
 
     // 取消所有机器人的未完成订单
@@ -233,12 +251,7 @@ export class BotService implements OnModuleInit {
       const canBuy = balance >= currentPrice * this.MIN_ORDER_SIZE;
       const canSell = holdingQuantity >= this.MIN_ORDER_SIZE;
 
-      // this.logger.debug(
-      //   `机器人 ${botUserId} 交易检查: 余额=$${balance.toFixed(2)}, 持仓=${holdingQuantity}股, 当前价格=$${currentPrice.toFixed(2)}, 可买=${canBuy}, 可卖=${canSell}`
-      // );
-
       if (!canBuy && !canSell) {
-        // this.logger.debug(`机器人 ${botUserId} 既不能买也不能卖，跳过交易`);
         return; // 既不能买也不能卖
       }
 
@@ -247,14 +260,8 @@ export class BotService implements OnModuleInit {
 
       if (!canBuy) {
         orderType = OrderType.SELL;
-        // this.logger.debug(
-        //   `机器人 ${botUserId} 决策: 强制选择 ${orderType} (canBuy=${canBuy}, canSell=${canSell})`
-        // );
       } else if (!canSell) {
         orderType = OrderType.BUY;
-        // this.logger.debug(
-        //   `机器人 ${botUserId} 决策: 强制选择 ${orderType} (canBuy=${canBuy}, canSell=${canSell})`
-        // );
       } else {
         // 两种操作都可以时，使用更平衡的策略
         let buyProbability = 0.5;
@@ -283,10 +290,6 @@ export class BotService implements OnModuleInit {
 
         orderType =
           Math.random() < buyProbability ? OrderType.BUY : OrderType.SELL;
-
-        // this.logger.debug(
-        //   `机器人 ${botUserId} 决策: 持仓=${holdingQuantity}, 盈亏比=${profitRatio.toFixed(3)}, 买入概率=${buyProbability.toFixed(2)}, 选择=${orderType}`
-        // );
       }
 
       // 生成订单价格和数量：使用概率分布，越靠近市价的订单数量越少
@@ -299,9 +302,6 @@ export class BotService implements OnModuleInit {
         );
 
       if (!orderPrice || !quantity) {
-        // this.logger.debug(
-        //   `机器人 ${botUserId} 无法生成有效订单: orderPrice=${orderPrice}, quantity=${quantity}, orderType=${orderType}`
-        // );
         return; // 无法生成有效订单
       }
 
@@ -314,9 +314,6 @@ export class BotService implements OnModuleInit {
       );
 
       if (!canPlaceOrder) {
-        // this.logger.debug(
-        //   `机器人 ${botUserId} 最终检查失败: ${orderType} ${quantity}股 @ $${orderPrice.toFixed(2)}`
-        // );
         return;
       }
 
@@ -334,18 +331,6 @@ export class BotService implements OnModuleInit {
           orderMethod === OrderMethod.MARKET
             ? 0
             : Math.abs(((orderPrice - currentPrice) / currentPrice) * 100);
-
-        // this.logger.debug(
-        //   `机器人 ${botUserId} 下单: ${orderType} ${quantity}股 @ $${orderPrice.toFixed(
-        //     2
-        //   )} ${
-        //     orderMethod === OrderMethod.MARKET
-        //       ? '(市价)'
-        //       : `(限价,偏离${priceDeviation.toFixed(2)}%)`
-        //   } (当前市价:$${currentPrice.toFixed(
-        //     2
-        //   )}, 持仓:${holdingQuantity}, 余额:$${balance.toFixed(2)})`
-        // );
       }
     } catch (error) {
       this.logger.error(`机器人 ${botUserId} 下单失败:`, error);
@@ -601,6 +586,110 @@ export class BotService implements OnModuleInit {
     }
   }
 
+  /** 执行健康检查和资源补充 */
+  private async performHealthCheck() {
+    try {
+      for (const botUserId of this.botUsers) {
+        await this.checkAndRefillBotResources(botUserId);
+      }
+
+      // 执行市场平衡检查
+      await this.balanceMarketDirection();
+    } catch (error) {
+      this.logger.error('健康检查失败:', error);
+    }
+  }
+
+  /** 检查并补充机器人资源 */
+  private async checkAndRefillBotResources(botUserId: number) {
+    try {
+      const user = await this.userService.findById(botUserId);
+      if (!user) return;
+
+      // 检查并补充资金
+      if (user.balance.toNumber() < this.MIN_BALANCE_THRESHOLD) {
+        await this.userService.updateBalance(
+          botUserId,
+          this.BALANCE_REFILL_AMOUNT
+        );
+        this.logger.debug(
+          `机器人 ${botUserId} 资金补充: ${this.BALANCE_REFILL_AMOUNT}`
+        );
+      }
+
+      // 检查并补充持仓
+      const position = await this.userService.getUserPosition(
+        botUserId,
+        'AAPL'
+      );
+      if (!position || position.quantity < this.MIN_POSITION_THRESHOLD) {
+        const refillQuantity = Math.floor(Math.random() * 200) + 100; // 100-300股
+        const avgPrice = 150 + Math.random() * 50; // 150-200价格区间
+        await this.userService.updateUserPosition(
+          botUserId,
+          'AAPL',
+          (position?.quantity || 0) + refillQuantity,
+          avgPrice
+        );
+        this.logger.debug(`机器人 ${botUserId} 持仓补充: ${refillQuantity}股`);
+      }
+    } catch (error) {
+      this.logger.error(`机器人 ${botUserId} 资源检查失败:`, error);
+    }
+  }
+
+  /** 市场方向平衡机制 */
+  private async balanceMarketDirection() {
+    try {
+      // 获取最近的交易记录
+      const recentTrades = await this.prisma.trade.findMany({
+        orderBy: { executedAt: 'desc' },
+        take: 10,
+        select: { price: true, executedAt: true },
+      });
+
+      if (recentTrades.length < 5) return;
+
+      // 计算价格趋势
+      const prices = recentTrades.map((trade) => trade.price.toNumber());
+      const priceChange = prices[0] - prices[prices.length - 1];
+      const changePercent = Math.abs(priceChange) / prices[prices.length - 1];
+
+      // 如果价格单向变化超过5%，触发反向交易
+      if (changePercent > 0.05) {
+        const isRising = priceChange > 0;
+        await this.executeBalancingTrades(isRising);
+        this.logger.debug(
+          `检测到价格${isRising ? '上涨' : '下跌'}${(
+            changePercent * 100
+          ).toFixed(2)}%，执行平衡交易`
+        );
+      }
+    } catch (error) {
+      this.logger.error('市场平衡检查失败:', error);
+    }
+  }
+
+  /** 执行平衡交易 */
+  private async executeBalancingTrades(isPriceRising: boolean) {
+    try {
+      // 随机选择2-3个机器人执行反向交易
+      const selectedBots = this.botUsers
+        .sort(() => Math.random() - 0.5)
+        .slice(0, Math.floor(Math.random() * 2) + 2);
+
+      const currentPrice = await this.getCurrentMarketPrice();
+
+      for (const botUserId of selectedBots) {
+        // 价格上涨时增加卖出，价格下跌时增加买入
+        const orderType = isPriceRising ? OrderType.SELL : OrderType.BUY;
+        await this.placeLiquidityOrder(botUserId, orderType, currentPrice);
+      }
+    } catch (error) {
+      this.logger.error('执行平衡交易失败:', error);
+    }
+  }
+
   /** 确保市场流动性 - 做市策略 */
   private async ensureMarketLiquidity(currentPrice: number) {
     try {
@@ -680,21 +769,6 @@ export class BotService implements OnModuleInit {
           orderPrice,
           quantity
         );
-
-        const liquidityPriceDeviation =
-          orderMethod === OrderMethod.MARKET
-            ? 0
-            : Math.abs(((orderPrice - currentPrice) / currentPrice) * 100);
-
-        // this.logger.debug(
-        //   `机器人 ${botUserId} 下流动性订单: ${orderType} ${quantity}股 @ $${orderPrice.toFixed(
-        //     2
-        //   )} ${
-        //     orderMethod === OrderMethod.MARKET
-        //       ? '(市价)'
-        //       : `(限价,偏离${liquidityPriceDeviation.toFixed(2)}%)`
-        //   }`
-        // );
       }
     } catch (error) {
       this.logger.error(`机器人 ${botUserId} 下流动性订单失败:`, error);
