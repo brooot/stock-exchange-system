@@ -4,6 +4,7 @@
 dist
 tmp
 out-tsc
+*.tsbuildinfo
 
 # dependencies
 node_modules
@@ -55,3 +56,4 @@ out
 .env.production
 .env.development
 .env.*.local
+.trae/rules/project_rules.md

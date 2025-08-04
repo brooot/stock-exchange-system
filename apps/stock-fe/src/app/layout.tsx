@@ -1,5 +1,6 @@
 import './global.css';
 import Layout from '../components/Layout';
+import QueryProvider from '../components/QueryProvider';
 
 export const metadata = {
   title: '股票交易系统',
@@ -14,7 +15,9 @@ export default function RootLayout({
   return (
     <html lang="zh-CN">
       <body>
-        <Layout>{children}</Layout>
+        <QueryProvider>
+          <Layout>{children}</Layout>
+        </QueryProvider>
       </body>
     </html>
   );

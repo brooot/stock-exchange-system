@@ -200,7 +200,7 @@ export class OrderService {
       buyOrderId?: string;
       sellOrderId?: string;
     }
-    
+
     const trades: TradeInfo[] = [];
 
     // 查找对手盘订单
@@ -366,7 +366,7 @@ export class OrderService {
     if (result.trades.length > 0) {
       // 批量添加交易到处理队列，避免重复广播
       const batchTradeData: BatchTradeProcessingData = {
-        trades: result.trades.map(tradeInfo => ({
+        trades: result.trades.map((tradeInfo) => ({
           id: tradeInfo.trade.id,
           buyOrderId: tradeInfo.trade.buyOrderId,
           sellOrderId: tradeInfo.trade.sellOrderId,
@@ -377,21 +377,17 @@ export class OrderService {
         totalVolume: result.filledQuantity,
         timestamp: Date.now(),
       };
-      
+
       // 添加批量交易处理到队列
       await this.queueService.addBatchTradeProcessing(batchTradeData);
-      
+
       // 添加市场数据更新到队列（一次撮合只需要一次市场数据更新）
-      await this.queueService.addMarketDataUpdate(
+      await this.queueService.addMarketDataUpdate(symbol, 'market', {
         symbol,
-        'market',
-        {
-          symbol,
-          price: result.trades[result.trades.length - 1]?.price || newOrder.price,
-          volume: result.filledQuantity,
-          timestamp: Date.now(),
-        }
-      );
+        price: result.trades[result.trades.length - 1]?.price || newOrder.price,
+        volume: result.filledQuantity,
+        timestamp: Date.now(),
+      });
     }
 
     return {

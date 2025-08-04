@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { useKlineData, useAvailableIntervals } from '../../hooks/useKlineQuery';
 
 // 动态导入 echarts 以避免 SSR 问题
 let echarts: any = null;
@@ -107,14 +108,10 @@ const KLineChart = React.memo(function KLineChart({
 
   // 组件状态
   const [isChartReady, setIsChartReady] = useState(false);
-  const [intervals, setIntervals] = useState(DEFAULT_INTERVALS);
-  const [intervalsLoading, setIntervalsLoading] = useState(false);
   const [echartsLoaded, setEchartsLoaded] = useState(false);
   const [currentInterval, setCurrentInterval] = useState(initialInterval);
   const [klineData, setKlineData] = useState<Record<string, KlineData[]>>({});
-  const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // 动态加载ECharts库和组件
   useEffect(() => {
@@ -179,46 +176,43 @@ const KLineChart = React.memo(function KLineChart({
     loadECharts();
   }, []);
 
-  // 获取K线数据
-  const fetchKlineData = useCallback(async (interval: string) => {
-    if (klineData[interval]) return; // 如果已有数据则不重复获取
+  // 使用 TanStack Query 获取K线数据
+  const {
+    data: queryKlineData,
+    isLoading: queryIsLoading,
+    error: queryError
+  } = useKlineData({
+    symbol,
+    interval: currentInterval,
+    limit: 100,
+    enabled: true
+  });
 
-    setIsLoading(true);
-    setError(null);
+  // 使用 TanStack Query 获取可用时间间隔
+  const {
+    data: availableIntervals,
+    isLoading: intervalsLoading
+  } = useAvailableIntervals();
 
-    try {
-      const response = await fetch(
-        `http://${process.env.NEXT_PUBLIC_BACKEND_HOST}:${process.env.NEXT_PUBLIC_BACKEND_PORT}/api/kline?symbol=${symbol}&interval=${interval}&limit=100`,
-        {
-          credentials: 'include',
-        }
-      );
+  // 获取刷新方法（暂时未使用，如需强制刷新可取消注释）
+  // const { refreshKlineData } = useRefreshKlineData();
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+  // 手动刷新K线数据的方法现在通过 TanStack Query 处理
+  // 如需强制刷新数据可使用 refreshKlineData
 
-      const data: KlineData[] = await response.json();
-
-      // 确保数据按时间戳排序并去重
-      const sortedData = data
-        .filter(
-          (item, index, arr) =>
-            arr.findIndex((t) => t.timestamp === item.timestamp) === index
-        )
-        .sort((a, b) => a.timestamp - b.timestamp);
-
-      setKlineData((prev) => ({
+  // 同步 TanStack Query 数据到本地状态
+  useEffect(() => {
+    if (queryKlineData && queryKlineData.length > 0) {
+      setKlineData(prev => ({
         ...prev,
-        [interval]: sortedData,
+        [currentInterval]: queryKlineData
       }));
-    } catch (err) {
-      console.error('获取K线数据失败:', err);
-      setError(err instanceof Error ? err.message : '获取K线数据失败');
-    } finally {
-      setIsLoading(false);
     }
-  }, [symbol, klineData]);
+  }, [queryKlineData, currentInterval]);
+
+  // 合并状态：使用 TanStack Query 的加载状态
+  const isLoading = queryIsLoading;
+  const error = queryError ? (queryError as Error).message : null;
 
   // 节流更新函数
   const throttledUpdate = useCallback(() => {
@@ -355,7 +349,6 @@ const KLineChart = React.memo(function KLineChart({
     socket.on('connect', () => {
       console.log('K线数据WebSocket已连接');
       setIsConnected(true);
-      setError(null);
     });
 
     socket.on('disconnect', () => {
@@ -365,7 +358,6 @@ const KLineChart = React.memo(function KLineChart({
 
     socket.on('connect_error', (err) => {
       console.error('K线数据WebSocket连接错误:', err);
-      setError('WebSocket连接失败');
       setIsConnected(false);
     });
 
@@ -383,49 +375,26 @@ const KLineChart = React.memo(function KLineChart({
     };
   }, [handleKlineUpdate, handlePriceUpdate]);
 
-  // 当时间周期改变时，获取对应的历史数据
-  useEffect(() => {
-    if (!klineData[currentInterval]) {
-      fetchKlineData(currentInterval);
+  // TanStack Query 会自动处理时间周期变化时的数据获取
+
+  // 处理可用时间间隔数据
+  const intervals = useMemo(() => {
+    if (availableIntervals && Array.isArray(availableIntervals.intervals)) {
+      return availableIntervals.intervals.map((value: string) => ({
+        value,
+        label: getIntervalLabel(value)
+      }));
     }
-  }, [currentInterval, fetchKlineData]);
-
-  // 获取支持的时间周期列表
-  useEffect(() => {
-    const fetchSupportedIntervals = async () => {
-      try {
-        setIntervalsLoading(true);
-        const response = await fetch(
-          `http://${process.env.NEXT_PUBLIC_BACKEND_HOST}:${process.env.NEXT_PUBLIC_BACKEND_PORT}/api/kline/intervals`,
-          {
-            credentials: 'include',
-          }
-        );
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        const intervalOptions = data.intervals.map((value: string) => ({
-          value,
-          label: getIntervalLabel(value)
-        }));
-        setIntervals(intervalOptions);
-      } catch (error) {
-        console.error('获取支持的时间周期失败:', error);
-        // 发生错误时保持使用默认值
-      } finally {
-        setIntervalsLoading(false);
-      }
-    };
-
-    fetchSupportedIntervals();
-  }, []);
+    return DEFAULT_INTERVALS;
+  }, [availableIntervals]);
 
   // 切换时间周期
   const changeInterval = useCallback((newInterval: string) => {
     setCurrentInterval(newInterval);
     onIntervalChange?.(newInterval);
+
+    // TanStack Query 会自动处理数据获取
+    // 如果需要强制刷新，可以调用 refreshKlineData
   }, [onIntervalChange]);
 
   // 初始化ECharts图表实例

@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { orderAPI, tradeAPI } from '../../utils/api';
+import { useMyOrders, useMyTrades } from '../../hooks/useApiQueries';
 
 interface Order {
   id: string;
@@ -38,38 +38,17 @@ interface Trade {
 }
 
 export default function HistoryPage() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [trades, setTrades] = useState<Trade[]>([]);
   const [activeTab, setActiveTab] = useState<'orders' | 'trades'>('orders');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const router = useRouter();
 
-  useEffect(() => {
-    // 由于token现在存储在httpOnly cookie中，我们无法直接检查
-    // 让后端API调用来验证认证状态
-    fetchData();
-  }, [router]);
+  // 使用 TanStack Query hooks
+  const { data: ordersResponse, isLoading: ordersLoading, error: ordersError } = useMyOrders();
+  const { data: tradesResponse, isLoading: tradesLoading, error: tradesError } = useMyTrades();
 
-  const fetchData = async () => {
-    try {
-      // 获取订单历史
-      const ordersResponse = await orderAPI.getMyOrders();
-      setOrders(ordersResponse.data);
-
-      // 获取交易历史
-      const tradesResponse = await tradeAPI.getMyTrades();
-      setTrades(tradesResponse.data);
-    } catch (err: any) {
-      if (err.response?.status === 401) {
-        // 401错误已在拦截器中处理，会自动跳转到登录页
-        return;
-      }
-      setError('获取数据失败');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const orders = ordersResponse?.data || [];
+  const trades = tradesResponse?.data || [];
+  const loading = ordersLoading || tradesLoading;
+  const error = ordersError || tradesError ? '获取数据失败' : '';
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('zh-CN');

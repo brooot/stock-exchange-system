@@ -1,82 +1,57 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { botAPI } from '../../utils/api';
-
-interface BotStatus {
-  isRunning: boolean;
-  botCount: number;
-  totalOrders: number;
-  lastActivity?: string;
-}
+import { useBotStatus, useStartBotTrading, useStopBotTrading, type BotStatus } from '../../hooks/useApiQueries';
 
 interface BotControlProps {
   className?: string;
 }
 
 export default function BotControl({ className = '' }: BotControlProps) {
-  const [botStatus, setBotStatus] = useState<BotStatus>({
-    isRunning: false,
-    botCount: 0,
-    totalOrders: 0,
-  });
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // 获取机器人状态
-  const fetchBotStatus = async () => {
-    try {
-      const response = await botAPI.getBotStatus();
-      setBotStatus(response.data);
-    } catch (err: any) {
-      console.error('获取机器人状态失败:', err);
-      setError('获取机器人状态失败');
-    }
+  const { data: botStatusResponse } = useBotStatus();
+  const startBotMutation = useStartBotTrading();
+  const stopBotMutation = useStopBotTrading();
+
+  const botStatus = botStatusResponse?.data || {
+    isRunning: false,
+    botCount: 0,
+    totalOrders: 0,
   };
+  const loading = startBotMutation.isPending || stopBotMutation.isPending;
 
   // 启动机器人
-  const startBot = async () => {
-    setLoading(true);
+  const startBot = () => {
     setError(null);
     setSuccess(null);
     
-    try {
-      await botAPI.startBotTrading();
-      setSuccess('机器人交易已启动');
-      await fetchBotStatus();
-    } catch (err: any) {
-      setError(err.response?.data?.message || '启动机器人失败');
-    } finally {
-      setLoading(false);
-    }
+    startBotMutation.mutate(undefined, {
+      onSuccess: () => {
+        setSuccess('机器人交易已启动');
+      },
+      onError: (err: any) => {
+        setError(err.response?.data?.message || '启动机器人失败');
+      }
+    });
   };
 
   // 停止机器人
-  const stopBot = async () => {
-    setLoading(true);
+  const stopBot = () => {
     setError(null);
     setSuccess(null);
     
-    try {
-      await botAPI.stopBotTrading();
-      setSuccess('机器人交易已停止');
-      await fetchBotStatus();
-    } catch (err: any) {
-      setError(err.response?.data?.message || '停止机器人失败');
-    } finally {
-      setLoading(false);
-    }
+    stopBotMutation.mutate(undefined, {
+      onSuccess: () => {
+        setSuccess('机器人交易已停止');
+      },
+      onError: (err: any) => {
+        setError(err.response?.data?.message || '停止机器人失败');
+      }
+    });
   };
 
-  // 组件挂载时获取状态
-  useEffect(() => {
-    fetchBotStatus();
-    
-    // 定期刷新状态
-    const interval = setInterval(fetchBotStatus, 5000);
-    return () => clearInterval(interval);
-  }, []);
 
   // 清除消息
   useEffect(() => {

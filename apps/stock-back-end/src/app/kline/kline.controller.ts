@@ -12,15 +12,17 @@ export class KlineController {
    * @param limit 数据条数，默认100
    */
   @Get()
-  getKlineData(
+  async getKlineData(
     @Query('symbol') symbol = 'AAPL',
     @Query('interval') interval = '1m',
     @Query('limit') limit = '100'
-  ): KlineData[] {
+  ): Promise<KlineData[]> {
     const limitNum = parseInt(limit, 10);
-    const validLimit = isNaN(limitNum) ? 100 : Math.min(Math.max(limitNum, 1), 1000);
-    
-    return this.klineService.getKlineData(symbol, interval, validLimit);
+    const validLimit = isNaN(limitNum)
+      ? 100
+      : Math.min(Math.max(limitNum, 1), 1000);
+
+    return await this.klineService.getKlineData(symbol, interval, validLimit);
   }
 
   /**
@@ -29,7 +31,7 @@ export class KlineController {
   @Get('intervals')
   getSupportedIntervals(): { intervals: string[] } {
     return {
-      intervals: this.klineService.getSupportedIntervals()
+      intervals: this.klineService.getSupportedIntervals(),
     };
   }
 }

@@ -91,5 +91,20 @@ export const botAPI = {
   getBotStatus: () => api.get('/bot/status'),
 };
 
+export const klineAPI = {
+  // 获取K线数据
+  getKlineData: (params: {
+    symbol?: string;
+    interval: string;
+    limit?: number;
+  }) => {
+    const { symbol = 'AAPL', interval, limit = 100 } = params;
+    return api.get(`/kline?symbol=${symbol}&interval=${interval}&limit=${limit}`);
+  },
+
+  // 获取可用的时间间隔
+  getAvailableIntervals: () => api.get('/kline/intervals'),
+};
+
 // 导出axios实例，以备特殊需求
 export default api;

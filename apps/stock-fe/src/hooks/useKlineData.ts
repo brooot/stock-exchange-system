@@ -1,5 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
+import {
+  useKlineData as useKlineQuery,
+  useRefreshKlineData,
+} from './useKlineQuery';
 
 interface KlineData {
   timestamp: number;
@@ -18,63 +22,59 @@ interface KlineUpdateEvent {
   isNewKline: boolean;
 }
 
-interface PriceUpdateEvent {
-  symbol: string;
-  price: number;
-  volume: number;
-  timestamp: Date;
-  tradeId: number;
+interface UseKlineDataParams {
+  symbol?: string;
+  initialInterval?: string;
 }
 
-export const useKlineData = (initialInterval = '1m') => {
+export const useKlineData = (params: UseKlineDataParams = {}) => {
+  const { symbol = 'AAPL', initialInterval = '1m' } = params;
   const [klineData, setKlineData] = useState<Record<string, KlineData[]>>({});
   const [currentInterval, setCurrentInterval] = useState(initialInterval);
-  const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const socketRef = useRef<Socket | null>(null);
   const updateThrottleRef = useRef<NodeJS.Timeout | null>(null);
   const pendingUpdatesRef = useRef<Map<string, KlineData>>(new Map());
 
-  // 获取历史K线数据
-  const fetchKlineData = useCallback(async (interval: string, limit = 100) => {
-    try {
-      setIsLoading(true);
-      setError(null);
+  // 使用 TanStack Query 获取K线数据
+  const {
+    data: queryKlineData,
+    isLoading,
+    error: queryError,
+  } = useKlineQuery({
+    symbol,
+    interval: currentInterval,
+    limit: 100,
+    enabled: true,
+  });
 
-      const response = await fetch(
-        `http://${process.env.NEXT_PUBLIC_BACKEND_HOST}:${process.env.NEXT_PUBLIC_BACKEND_PORT}/api/kline?interval=${interval}&limit=${limit}`,
-        {
-          credentials: 'include',
-        }
-      );
+  // 获取刷新方法
+  const { refreshKlineData } = useRefreshKlineData();
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data: KlineData[] = await response.json();
-
-      // 确保数据按时间戳排序并去重
-      const sortedData = data
-        .filter(
-          (item, index, arr) =>
-            arr.findIndex((t) => t.timestamp === item.timestamp) === index
-        )
-        .sort((a, b) => a.timestamp - b.timestamp);
-
+  // 同步 TanStack Query 数据到本地状态
+  useEffect(() => {
+    if (queryKlineData && queryKlineData.length > 0) {
       setKlineData((prev) => ({
         ...prev,
-        [interval]: sortedData,
+        [currentInterval]: queryKlineData,
       }));
-    } catch (err) {
-      console.error('获取K线数据失败:', err);
-      setError(err instanceof Error ? err.message : '获取K线数据失败');
-    } finally {
-      setIsLoading(false);
     }
-  }, []);
+  }, [queryKlineData, currentInterval]);
+
+  // 获取历史K线数据（兼容旧接口）
+  const fetchKlineData = useCallback(
+    async (interval: string, limit = 100) => {
+      try {
+        await refreshKlineData({ symbol, interval, limit });
+      } catch (err) {
+        console.error('获取K线数据失败:', err);
+      }
+    },
+    [symbol, refreshKlineData]
+  );
+
+  const error = queryError ? (queryError as Error).message : null;
 
   // 节流更新函数
   const throttledUpdate = useCallback(() => {
@@ -144,9 +144,8 @@ export const useKlineData = (initialInterval = '1m') => {
   );
 
   // 处理价格更新事件（用于实时价格显示）
-  const handlePriceUpdate = useCallback((priceUpdate: PriceUpdateEvent) => {
+  const handlePriceUpdate = useCallback(() => {
     // 这里可以添加实时价格更新的逻辑
-    // console.log('价格更新:', priceUpdate);
   }, []);
 
   // 初始化WebSocket连接
@@ -164,7 +163,6 @@ export const useKlineData = (initialInterval = '1m') => {
     socket.on('connect', () => {
       console.log('K线数据WebSocket已连接');
       setIsConnected(true);
-      setError(null);
     });
 
     socket.on('disconnect', () => {
@@ -174,7 +172,6 @@ export const useKlineData = (initialInterval = '1m') => {
 
     socket.on('connect_error', (err) => {
       console.error('K线数据WebSocket连接错误:', err);
-      setError('WebSocket连接失败');
       setIsConnected(false);
     });
 
@@ -209,27 +206,6 @@ export const useKlineData = (initialInterval = '1m') => {
     fetchKlineData(currentInterval);
   }, [currentInterval, fetchKlineData]);
 
-  // 获取支持的时间周期
-  const getSupportedIntervals = useCallback(async () => {
-    try {
-      const response = await fetch(
-        `http://${process.env.NEXT_PUBLIC_BACKEND_HOST}:${process.env.NEXT_PUBLIC_BACKEND_PORT}/api/kline/intervals`,
-        {
-          credentials: 'include',
-        }
-      );
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      return data.intervals;
-    } catch (err) {
-      console.error('获取支持的时间周期失败:', err);
-      return ['1m', '5m', '15m', '1h', '1d']; // 返回默认值
-    }
-  }, []);
-
   return {
     // 数据状态
     klineData: klineData[currentInterval] || [],
@@ -242,7 +218,6 @@ export const useKlineData = (initialInterval = '1m') => {
     // 操作方法
     changeInterval,
     refreshData,
-    getSupportedIntervals,
 
     // WebSocket状态
     socket: socketRef.current,

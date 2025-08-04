@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '../../hooks/useToast';
-import LoadingSpinner from '../../components/LoadingSpinner';
-import { authAPI } from '../../utils/api';
+import { useLogin, useRegister } from '../../hooks/useApiQueries';
 
 interface LoginForm {
   username: string;
@@ -21,56 +20,57 @@ export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [loginForm, setLoginForm] = useState<LoginForm>({ username: '', password: '' });
   const [registerForm, setRegisterForm] = useState<RegisterForm>({ username: '', password: '', confirmPassword: '' });
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
   const { showSuccess, showError } = useToast();
 
+  // 使用 TanStack Query mutations
+  const loginMutation = useLogin();
+  const registerMutation = useRegister();
+
+  const loading = loginMutation.isPending || registerMutation.isPending;
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
 
-    try {
-      const response = await authAPI.login(loginForm);
-      // token现在存储在httpOnly cookie中，不需要手动存储
-      localStorage.setItem('username', response.data.username);
-      showSuccess('登录成功！');
-      router.push('/dashboard');
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.message || '登录失败';
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
-    }
+    loginMutation.mutate(loginForm, {
+      onSuccess: (response) => {
+        // token现在存储在httpOnly cookie中，不需要手动存储
+        localStorage.setItem('username', response.data.username);
+        showSuccess('登录成功！');
+        router.push('/dashboard');
+      },
+      onError: (err: any) => {
+        const errorMessage = err.response?.data?.message || '登录失败';
+        setError(errorMessage);
+      }
+    });
   };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
 
     if (registerForm.password !== registerForm.confirmPassword) {
       setError('密码确认不匹配');
-      setLoading(false);
       return;
     }
 
-    try {
-      await authAPI.register({
-        username: registerForm.username,
-        password: registerForm.password,
-      });
-
-      showSuccess('注册成功！请登录');
-      setIsLogin(true);
-      setRegisterForm({ username: '', password: '', confirmPassword: '' });
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.message || '注册失败';
-      setError(errorMessage);
-    } finally {
-      setLoading(false);
-    }
+    registerMutation.mutate({
+      username: registerForm.username,
+      password: registerForm.password,
+    }, {
+      onSuccess: () => {
+        showSuccess('注册成功！请登录');
+        setIsLogin(true);
+        setRegisterForm({ username: '', password: '', confirmPassword: '' });
+      },
+      onError: (err: any) => {
+        const errorMessage = err.response?.data?.message || '注册失败';
+        setError(errorMessage);
+      }
+    });
   };
 
   return (
@@ -84,8 +84,8 @@ export default function AuthPage() {
         <div className="flex mb-6">
           <button
             className={`flex-1 py-2 px-4 text-center font-medium rounded-l-lg ${isLogin
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
               }`}
             onClick={() => setIsLogin(true)}
           >
@@ -93,8 +93,8 @@ export default function AuthPage() {
           </button>
           <button
             className={`flex-1 py-2 px-4 text-center font-medium rounded-r-lg ${!isLogin
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
               }`}
             onClick={() => setIsLogin(false)}
           >

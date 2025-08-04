@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { tradeAPI } from '../utils/api';
+import { useMarketData } from './useApiQueries';
 
 interface MarketData {
   symbol: string;
@@ -29,19 +29,14 @@ export const useWebSocket = () => {
   const [isConnected, setIsConnected] = useState(false);
   const socketRef = useRef<Socket | null>(null);
 
-  // 获取初始市场数据
-  const fetchInitialMarketData = async () => {
-    try {
-      const response = await tradeAPI.getMarketData();
-      setMarketData(response.data);
-    } catch (err: any) {
-      console.error('获取市场数据失败:', err);
-    }
-  };
+  // 使用 TanStack Query 获取初始市场数据
+  const { data: marketDataResponse } = useMarketData();
 
   useEffect(() => {
-    // 获取初始市场数据
-    fetchInitialMarketData();
+    // 设置初始市场数据
+    if (marketDataResponse?.data) {
+      setMarketData(marketDataResponse.data);
+    }
     // 连接到WebSocket服务器
     const socket = io(
       `http://${process.env.NEXT_PUBLIC_BACKEND_HOST}:${process.env.NEXT_PUBLIC_BACKEND_PORT}/market`,

@@ -1,18 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import Decimal from 'decimal.js';
-import { accountAPI, orderAPI, authAPI, tradeAPI, positionAPI } from '../../utils/api';
+import { useAccountInfo, useUserPositions, useCreateOrder } from '../../hooks/useApiQueries';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { AccountInfo, PositionTable, MarketData, TradingPanel, BotControl, KLineChart } from '../../components/dashboard';
 
-interface AccountInfo {
-  balance: string;
-}
-
 interface Position {
-  id: string;
   symbol: string;
   quantity: number;
   avgPrice: number;
@@ -34,52 +28,30 @@ interface MarketData {
 
 
 export default function DashboardPage() {
-  const router = useRouter();
   const { marketData, lastTrade, isConnected } = useWebSocket();
 
-  const [accountInfo, setAccountInfo] = useState<AccountInfo | null>(null);
-  const [positions, setPositions] = useState<Position[]>([]);
+  const { data: accountResponse } = useAccountInfo();
+  const { data: positionsResponse } = useUserPositions();
+  const createOrderMutation = useCreateOrder();
+
   const [portfolioValue, setPortfolioValue] = useState<number>(0);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  useEffect(() => {
-    // 由于token现在存储在httpOnly cookie中，我们无法直接检查
-    // 让后端API调用来验证认证状态
-    fetchAccountInfo();
-    fetchPositions();
-  }, [router]);
+  const accountInfo = accountResponse?.data ? {
+    balance: accountResponse.data.balance.toString()
+  } : null;
+  const positions = (positionsResponse?.data || []).map((position, index) => ({
+    ...position,
+    id: `${position.symbol}-${index}` // 为每个持仓添加唯一 id
+  }));
 
   // 当持仓更新时，重新计算投资组合价值
   useEffect(() => {
     calculatePortfolioValue();
   }, [positions]);
 
-  const fetchAccountInfo = async () => {
-    try {
-      const response = await accountAPI.getAccountInfo();
-      setAccountInfo(response.data);
-    } catch (err: any) {
-      if (err.response?.status === 401) {
-        // 401错误已在拦截器中处理，会自动跳转到登录页
-        return;
-      }
-      setError('获取账户信息失败');
-    }
-  };
 
-  const fetchPositions = async () => {
-    try {
-      const response = await positionAPI.getUserPositions();
-      setPositions(response.data);
-    } catch (err: any) {
-      if (err.response?.status === 401) {
-        return;
-      }
-      console.error('获取持仓信息失败:', err);
-    }
-  };
 
   // 计算投资组合总价值
   const calculatePortfolioValue = () => {
@@ -104,16 +76,7 @@ export default function DashboardPage() {
 
 
 
-  const handleLogout = async () => {
-    try {
-      await authAPI.logout();
-    } catch (err) {
-      console.error('退出登录失败:', err);
-    } finally {
-      localStorage.removeItem('username');
-      router.push('/auth');
-    }
-  };
+
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -147,23 +110,18 @@ export default function DashboardPage() {
           <TradingPanel
             marketData={marketData}
             onCreateOrder={async (orderData) => {
-              setLoading(true);
               setError('');
               setSuccess('');
 
               try {
-                await orderAPI.createOrder(orderData);
+                await createOrderMutation.mutateAsync(orderData);
                 setSuccess('订单提交成功！');
-                fetchAccountInfo();
-                fetchPositions();
               } catch (err: any) {
                 const errorMessage = err.response?.data?.message || '订单提交失败';
                 setError(errorMessage);
-              } finally {
-                setLoading(false);
               }
             }}
-            isLoading={loading}
+            isLoading={createOrderMutation.isPending}
             error={error}
             success={success}
           />

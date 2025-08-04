@@ -4,6 +4,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useToast } from '../hooks/useToast';
 import { ToastManager } from './Toast';
+import { useLogout } from '../hooks/useApiQueries';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -12,14 +13,14 @@ interface LayoutProps {
 export default function Layout({ children }: LayoutProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const { toasts, removeToast, showSuccess } = useToast();
+
+  const logoutMutation = useLogout();
 
   useEffect(() => {
     // 由于token现在存储在httpOnly cookie中，我们无法直接检查认证状态
     // 对于需要认证的页面，让各个页面组件自己处理认证检查
-    setIsAuthenticated(true); // 假设已认证，让API调用来验证
     setLoading(false);
 
     // 兜底跳转逻辑：如果访问的不是已知页面，跳转到dashboard
@@ -30,20 +31,20 @@ export default function Layout({ children }: LayoutProps) {
   }, [pathname, router]);
 
   const handleLogout = async () => {
-    try {
-      // 调用后端退出登录API来清除cookie
-      await fetch('http://localhost:3001/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
-      });
-    } catch (err) {
-      console.error('退出登录失败:', err);
-    } finally {
-      localStorage.removeItem('username');
-      setIsAuthenticated(false);
-      showSuccess('已成功退出登录');
-      router.push('/auth');
-    }
+    logoutMutation.mutate(undefined, {
+      onSuccess: () => {
+        localStorage.removeItem('username');
+        showSuccess('已成功退出登录');
+        router.push('/auth');
+      },
+      onError: (err) => {
+        console.error('退出登录失败:', err);
+        // 即使退出失败，也清除本地状态
+        localStorage.removeItem('username');
+        showSuccess('已成功退出登录');
+        router.push('/auth');
+      }
+    });
   };
 
   const navigation = [

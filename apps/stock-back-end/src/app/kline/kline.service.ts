@@ -89,10 +89,69 @@ export class KlineService implements OnModuleDestroy {
    */
   private async initializeKlineCache() {
     try {
-      const symbol = 'AAPL';
+      // 获取所有有数据的股票符号
+      const symbols = await this.getAvailableSymbols();
+
+      if (symbols.length === 0) {
+        console.log('没有找到股票数据，使用默认AAPL进行初始化');
+        await this.initializeSymbolCache('AAPL');
+        return;
+      }
+
+      console.log(`开始初始化K线缓存，股票数量: ${symbols.length}`);
+
+      // 并行初始化所有股票的缓存以提高性能
+      await Promise.all(symbols.map(symbol => this.initializeSymbolCache(symbol)));
+
+      console.log('K线缓存初始化完成');
+    } catch (error) {
+      console.error('K线缓存初始化失败:', error);
+      // 失败时至少初始化AAPL
+      try {
+        await this.initializeSymbolCache('AAPL');
+        console.log('已回退到AAPL缓存初始化');
+      } catch (fallbackError) {
+        console.error('AAPL缓存初始化也失败:', fallbackError);
+      }
+    }
+  }
+
+  /**
+   * 获取所有有数据的股票符号
+   */
+  private async getAvailableSymbols(): Promise<string[]> {
+    try {
+      const baseSymbols = await this.prisma.klineBase.findMany({
+        select: { symbol: true },
+        distinct: ['symbol'],
+      });
+
+      const aggregatedSymbols = await this.prisma.klineAggregated.findMany({
+        select: { symbol: true },
+        distinct: ['symbol'],
+      });
+
+      // 合并并去重
+      const allSymbols = new Set([
+        ...baseSymbols.map(s => s.symbol),
+        ...aggregatedSymbols.map(s => s.symbol)
+      ]);
+
+      return Array.from(allSymbols);
+    } catch (error) {
+      console.error('获取股票符号失败:', error);
+      return ['AAPL']; // 默认返回AAPL
+    }
+  }
+
+  /**
+   * 为指定股票初始化缓存
+   */
+  private async initializeSymbolCache(symbol: string) {
+    try {
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
       // 加载基础周期（1分钟）数据
-      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
       const baseKlines = await this.prisma.klineBase.findMany({
         where: {
           symbol,
@@ -140,9 +199,9 @@ export class KlineService implements OnModuleDestroy {
         }
       }
 
-      console.log('K线缓存初始化完成');
+      console.log(`${symbol} K线缓存初始化完成`);
     } catch (error) {
-      console.error('K线缓存初始化失败:', error);
+      console.error(`${symbol} K线缓存初始化失败:`, error);
     }
   }
 
@@ -458,12 +517,148 @@ export class KlineService implements OnModuleDestroy {
   /**
    * 获取指定时间周期的K线数据
    */
-  getKlineData(symbol = 'AAPL', interval = '1m', limit = 100): KlineData[] {
+  async getKlineData(symbol = 'AAPL', interval = '1m', limit = 100): Promise<KlineData[]> {
     const cacheKey = `${symbol}_${interval}`;
-    const klineData = this.klineCache.get(cacheKey) || [];
+    let klineData = this.klineCache.get(cacheKey) || [];
+
+    // 如果缓存中的数据不足，尝试从数据库补充
+    if (klineData.length < Math.min(limit, 50)) {
+      console.log(`缓存数据不足 (${klineData.length}/${limit})，从数据库补充 ${symbol} ${interval} 数据`);
+      await this.loadDataFromDatabase(symbol, interval, limit);
+      klineData = this.klineCache.get(cacheKey) || [];
+
+      // 如果仍然数据不足且不是1分钟周期，尝试生成聚合数据
+      if (klineData.length < Math.min(limit, 30) && interval !== '1m') {
+        console.log(`聚合数据不足，尝试生成缺失的 ${symbol} ${interval} 聚合数据`);
+        await this.generateMissingAggregatedData(symbol, interval, limit);
+        klineData = this.klineCache.get(cacheKey) || [];
+      }
+    }
 
     // 返回最近的limit条数据
-    return klineData.slice(-limit);
+    const result = klineData.slice(-limit);
+    console.log(`返回K线数据: ${symbol} ${interval}, 请求${limit}条, 实际返回${result.length}条`);
+    return result;
+  }
+
+  /**
+   * 从数据库加载数据到缓存
+   */
+  private async loadDataFromDatabase(symbol: string, interval: string, limit: number) {
+    try {
+      const config = this.intervals[interval];
+      if (!config) {
+        console.warn(`不支持的时间周期: ${interval}`);
+        return;
+      }
+
+      const cacheKey = `${symbol}_${interval}`;
+
+      if (interval === '1m') {
+        // 加载基础1分钟数据
+        const baseKlines = await this.prisma.klineBase.findMany({
+          where: { symbol },
+          orderBy: { timestamp: 'desc' },
+          take: Math.max(limit, 200), // 至少加载200条以提供缓冲
+        });
+
+        const klineData = baseKlines
+          .reverse() // 恢复时间顺序
+          .map((k) => ({
+            timestamp: k.timestamp.getTime(),
+            open: k.open.toNumber(),
+            high: k.high.toNumber(),
+            low: k.low.toNumber(),
+            close: k.close.toNumber(),
+            volume: k.volume,
+            symbol: k.symbol,
+            interval: '1m',
+          }));
+
+        this.klineCache.set(cacheKey, klineData);
+      } else if (config.dbInterval) {
+        // 加载聚合数据
+        const aggregatedKlines = await this.prisma.klineAggregated.findMany({
+          where: {
+            symbol,
+            interval: config.dbInterval,
+          },
+          orderBy: { timestamp: 'desc' },
+          take: Math.max(limit, 200),
+        });
+
+        const klineData = aggregatedKlines
+          .reverse()
+          .map((k) => ({
+            timestamp: k.timestamp.getTime(),
+            open: k.open.toNumber(),
+            high: k.high.toNumber(),
+            low: k.low.toNumber(),
+            close: k.close.toNumber(),
+            volume: k.volume,
+            symbol: k.symbol,
+            interval,
+          }));
+
+        this.klineCache.set(cacheKey, klineData);
+      } else {
+        // 对于没有预聚合的时间周期，从基础数据生成
+        await this.generateMissingAggregatedData(symbol, interval, limit);
+      }
+    } catch (error) {
+      console.error(`从数据库加载K线数据失败: ${symbol} ${interval}`, error);
+    }
+  }
+
+  /**
+   * 生成缺失的聚合数据
+   */
+  private async generateMissingAggregatedData(symbol: string, interval: string, limit: number) {
+    try {
+      const config = this.intervals[interval];
+      if (!config || !config.dbInterval) return;
+
+      const intervalMs = config.ms;
+      const now = Date.now();
+      const startTime = now - (limit * intervalMs * 2); // 扩大范围确保有足够数据
+
+      console.log(`开始生成 ${symbol} ${interval} 的聚合数据，时间范围: ${new Date(startTime).toISOString()} - ${new Date(now).toISOString()}`);
+
+      // 检查哪些时间段缺少数据
+      const existingData = await this.prisma.klineAggregated.findMany({
+        where: {
+          symbol,
+          interval: config.dbInterval,
+          timestamp: {
+            gte: new Date(startTime),
+            lte: new Date(now)
+          }
+        },
+        select: { timestamp: true }
+      });
+
+      const existingTimestamps = new Set(existingData.map(d => d.timestamp.getTime()));
+      let generatedCount = 0;
+
+      // 按时间周期生成缺失的聚合数据
+      for (let timestamp = startTime; timestamp < now; timestamp += intervalMs) {
+        const alignedTimestamp = Math.floor(timestamp / intervalMs) * intervalMs;
+
+        if (!existingTimestamps.has(alignedTimestamp)) {
+          await this.generateAggregatedKline(symbol, interval, config, alignedTimestamp);
+          generatedCount++;
+
+          // 避免一次性生成过多数据，每生成10条暂停一下
+          if (generatedCount % 10 === 0) {
+            await new Promise(resolve => setTimeout(resolve, 10));
+          }
+        }
+      }
+
+      console.log(`完成生成 ${symbol} ${interval} 聚合数据，新生成 ${generatedCount} 条`);
+    } catch (error) {
+      console.error(`生成聚合数据失败: ${symbol} ${interval}`, error);
+    }
   }
 
   /**
