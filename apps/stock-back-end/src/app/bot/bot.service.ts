@@ -20,10 +20,26 @@ export class BotService implements OnModuleInit {
   private readonly MAX_ORDER_SIZE = 100; // 最大订单数量（减小以增加交易频率）
 
   // 新增：长期趋势控制参数
-  private readonly LONG_TERM_BULL_BIAS = 0.15; // 长期看涨偏向（15%）
-  private readonly TREND_CHECK_INTERVAL = 300000; // 趋势检查间隔（5分钟）
+  private readonly LONG_TERM_BULL_BIAS = 0.08; // 长期看涨偏向（8%，降低固定偏向）
+  private readonly TREND_CHECK_INTERVAL = 180000; // 趋势检查间隔（3分钟，更频繁）
   private trendCheckIntervalId: NodeJS.Timeout | null = null;
   private marketTrendBias = 0; // 市场趋势偏向：正值看涨，负值看跌
+
+  // 新增：市场情绪和波动性控制
+  private readonly MARKET_SENTIMENT_INTERVAL = 600000; // 市场情绪变化间隔（10分钟）
+  private readonly VOLATILITY_CHECK_INTERVAL = 120000; // 波动性检查间隔（2分钟）
+  private marketSentimentIntervalId: NodeJS.Timeout | null = null;
+  private volatilityCheckIntervalId: NodeJS.Timeout | null = null;
+  private marketSentiment = 0; // 市场情绪：-1到1之间，负值悲观，正值乐观
+  private volatilityMultiplier = 1.0; // 波动性倍数：影响价格偏离度
+  private trendCycle = 0; // 趋势周期：用于创建波浪式价格变化
+
+  // 新增：随机事件机制
+  private readonly RANDOM_EVENT_CHECK_INTERVAL = 30000; // 随机事件检查间隔（30秒）
+  private readonly RANDOM_EVENT_PROBABILITY = 0.002; // 随机事件概率（0.2%）
+  private randomEventIntervalId: NodeJS.Timeout | null = null;
+  private lastRandomEventTime = 0; // 上次随机事件时间
+  private readonly MIN_RANDOM_EVENT_INTERVAL = 300000; // 最小随机事件间隔（5分钟）
 
   // 资金和持仓管理配置
   private readonly MIN_BALANCE_THRESHOLD = 1000; // 最低资金阈值
@@ -85,6 +101,21 @@ export class BotService implements OnModuleInit {
         await this.checkLongTermTrend();
       }, this.TREND_CHECK_INTERVAL);
 
+      // 启动市场情绪变化
+      this.marketSentimentIntervalId = setInterval(async () => {
+        await this.updateMarketSentiment();
+      }, this.MARKET_SENTIMENT_INTERVAL);
+
+      // 启动波动性检查
+      this.volatilityCheckIntervalId = setInterval(async () => {
+        await this.updateVolatility();
+      }, this.VOLATILITY_CHECK_INTERVAL);
+
+      // 启动随机事件检查
+      this.randomEventIntervalId = setInterval(async () => {
+        await this.checkRandomEvents();
+      }, this.RANDOM_EVENT_CHECK_INTERVAL);
+
       this.logger.log('机器人交易系统已启动');
       return { success: true, message: '机器人交易系统已启动' };
     } catch (error) {
@@ -114,6 +145,21 @@ export class BotService implements OnModuleInit {
     if (this.trendCheckIntervalId) {
       clearInterval(this.trendCheckIntervalId);
       this.trendCheckIntervalId = null;
+    }
+
+    if (this.marketSentimentIntervalId) {
+      clearInterval(this.marketSentimentIntervalId);
+      this.marketSentimentIntervalId = null;
+    }
+
+    if (this.volatilityCheckIntervalId) {
+      clearInterval(this.volatilityCheckIntervalId);
+      this.volatilityCheckIntervalId = null;
+    }
+
+    if (this.randomEventIntervalId) {
+      clearInterval(this.randomEventIntervalId);
+      this.randomEventIntervalId = null;
     }
 
     // 取消所有机器人的未完成订单
@@ -280,8 +326,10 @@ export class BotService implements OnModuleInit {
         orderType = OrderType.BUY;
       } else {
         // 两种操作都可以时，使用更平衡的策略
+        // 综合考虑长期偏向、市场趋势、市场情绪和趋势周期
         let buyProbability =
-          0.5 + this.LONG_TERM_BULL_BIAS + this.marketTrendBias;
+          0.5 + this.LONG_TERM_BULL_BIAS + this.marketTrendBias + 
+          (this.marketSentiment * 0.1) + (Math.sin(this.trendCycle) * 0.05);
 
         // 基于持仓调整概率 - 更激进的平衡策略
         if (holdingQuantity > 150) {
@@ -394,9 +442,9 @@ export class BotService implements OnModuleInit {
     }
 
     // 限价单：使用概率分布
-    // 价格偏离度：使用PRICE_VARIANCE参数控制最大偏离范围
-    const maxDeviation = this.PRICE_VARIANCE; // 使用配置的价格波动范围
-    const minDeviation = 0.01; // 最小1%偏离
+    // 价格偏离度：使用PRICE_VARIANCE参数控制最大偏离范围，并考虑波动性倍数
+    const maxDeviation = this.PRICE_VARIANCE * this.volatilityMultiplier; // 使用配置的价格波动范围乘以波动性倍数
+    const minDeviation = 0.005; // 最小0.5%偏离
 
     // 使用指数分布生成价格偏离度
     const lambda = 3; // 指数分布参数，控制分布形状
@@ -809,75 +857,113 @@ export class BotService implements OnModuleInit {
     }
   }
 
-  /** 长期趋势检查机制 */
+  /** 长期趋势检查机制 - 改进版 */
   private async checkLongTermTrend() {
     try {
-      // 获取过去30分钟的交易记录
-      const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
-      const longTermTrades = await this.prisma.trade.findMany({
-        where: {
-          executedAt: { gte: thirtyMinutesAgo },
-        },
+      // 更新趋势周期，用于创建波浪式变化
+      this.trendCycle += 0.1;
+      if (this.trendCycle > Math.PI * 2) {
+        this.trendCycle = 0;
+      }
+
+      // 获取多个时间段的交易记录进行分析
+      const now = Date.now();
+      const fiveMinutesAgo = new Date(now - 5 * 60 * 1000);
+      const fifteenMinutesAgo = new Date(now - 15 * 60 * 1000);
+      const thirtyMinutesAgo = new Date(now - 30 * 60 * 1000);
+
+      // 短期趋势（5分钟）
+      const shortTermTrades = await this.prisma.trade.findMany({
+        where: { executedAt: { gte: fiveMinutesAgo } },
         orderBy: { executedAt: 'desc' },
-        take: 50,
+        take: 20,
         select: { price: true, executedAt: true },
       });
 
-      if (longTermTrades.length < 10) return;
+      // 中期趋势（15分钟）
+      const mediumTermTrades = await this.prisma.trade.findMany({
+        where: { executedAt: { gte: fifteenMinutesAgo } },
+        orderBy: { executedAt: 'desc' },
+        take: 40,
+        select: { price: true, executedAt: true },
+      });
 
-      // 计算长期价格变化
-      const prices = longTermTrades.map((trade) => trade.price.toNumber());
-      const latestPrice = prices[0];
-      const earliestPrice = prices[prices.length - 1];
-      const longTermChange = (latestPrice - earliestPrice) / earliestPrice;
+      // 长期趋势（30分钟）
+      const longTermTrades = await this.prisma.trade.findMany({
+        where: { executedAt: { gte: thirtyMinutesAgo } },
+        orderBy: { executedAt: 'desc' },
+        take: 60,
+        select: { price: true, executedAt: true },
+      });
 
-      // 动态调整市场趋势偏向，实现波浪上升效果
-      const trendAdjustment = longTermChange * 0.5; // 基于趋势变化的调整幅度
+      if (shortTermTrades.length < 5) return;
 
-      // 根据趋势方向调整marketTrendBias
-      if (longTermChange < -0.1) {
-        // 大幅下跌时增加看涨偏向
-        this.marketTrendBias += 0.2;
-        this.logger.log(
-          `检测到长期下跌${(Math.abs(longTermChange) * 100).toFixed(
-            2
-          )}%，增加买入压力，当前偏向: ${this.marketTrendBias.toFixed(3)}`
-        );
-        await this.executeTrendCorrection(true, 5);
-      } else if (longTermChange > 0.15) {
-        // 大幅上涨时减少看涨偏向，允许适度回调
-        this.marketTrendBias -= 0.15;
-        this.logger.log(
-          `检测到长期上涨${(longTermChange * 100).toFixed(
-            2
-          )}%，适度减少看涨偏向，当前偏向: ${this.marketTrendBias.toFixed(3)}`
-        );
+      // 计算不同时间段的价格变化
+      const shortTermChange = this.calculatePriceChange(shortTermTrades);
+      const mediumTermChange = this.calculatePriceChange(mediumTermTrades);
+      const longTermChange = this.calculatePriceChange(longTermTrades);
+
+      // 综合分析趋势，权重：短期30%，中期40%，长期30%
+      const weightedTrendChange = 
+        shortTermChange * 0.3 + mediumTermChange * 0.4 + longTermChange * 0.3;
+
+      // 动态调整市场趋势偏向，创建更真实的波动
+      let trendAdjustment = 0;
+      
+      if (weightedTrendChange < -0.08) {
+        // 显著下跌：强力反弹
+        trendAdjustment = 0.25;
+        await this.executeTrendCorrection(true, 6);
+        this.logger.log(`检测到显著下跌${(Math.abs(weightedTrendChange) * 100).toFixed(2)}%，执行强力反弹`);
+      } else if (weightedTrendChange < -0.04) {
+        // 中度下跌：适度反弹
+        trendAdjustment = 0.15;
+        await this.executeTrendCorrection(true, 3);
+      } else if (weightedTrendChange > 0.12) {
+        // 显著上涨：强力回调
+        trendAdjustment = -0.2;
+        await this.executeTrendCorrection(false, 4);
+        this.logger.log(`检测到显著上涨${(weightedTrendChange * 100).toFixed(2)}%，执行回调`);
+      } else if (weightedTrendChange > 0.06) {
+        // 中度上涨：适度回调
+        trendAdjustment = -0.1;
         await this.executeTrendCorrection(false, 2);
-      } else if (longTermChange > 0.05) {
-        // 温和上涨时轻微减少看涨偏向
-        this.marketTrendBias -= 0.05;
-      } else if (longTermChange < -0.03) {
-        // 温和下跌时轻微增加看涨偏向
-        this.marketTrendBias += 0.08;
+      } else if (weightedTrendChange > 0.02) {
+        // 温和上涨：轻微回调
+        trendAdjustment = -0.05;
+      } else if (weightedTrendChange < -0.02) {
+        // 温和下跌：轻微反弹
+        trendAdjustment = 0.08;
       } else {
-        // 价格相对稳定时保持当前偏向，但向长期看涨方向微调
-        this.marketTrendBias += 0.02;
+        // 横盘整理：随机小幅波动
+        trendAdjustment = (Math.random() - 0.5) * 0.1;
       }
 
-      // 限制marketTrendBias在合理范围内，避免极端偏向
-      this.marketTrendBias = Math.max(
-        -0.2,
-        Math.min(0.4, this.marketTrendBias)
-      );
+      // 应用趋势调整
+      this.marketTrendBias += trendAdjustment;
+
+      // 添加周期性波动，防止单调趋势
+      const cyclicAdjustment = Math.sin(this.trendCycle * 0.5) * 0.03;
+      this.marketTrendBias += cyclicAdjustment;
+
+      // 限制marketTrendBias在合理范围内
+      this.marketTrendBias = Math.max(-0.25, Math.min(0.35, this.marketTrendBias));
 
       this.logger.log(
-        `趋势检查完成 - 价格变化: ${(longTermChange * 100).toFixed(
-          2
-        )}%, 市场偏向: ${this.marketTrendBias.toFixed(3)}`
+        `趋势分析 - 短期:${(shortTermChange * 100).toFixed(1)}% 中期:${(mediumTermChange * 100).toFixed(1)}% 长期:${(longTermChange * 100).toFixed(1)}% 偏向:${this.marketTrendBias.toFixed(3)}`
       );
     } catch (error) {
       this.logger.error('长期趋势检查失败:', error);
     }
+  }
+
+  /** 计算价格变化百分比 */
+  private calculatePriceChange(trades: { price: any }[]): number {
+    if (trades.length < 2) return 0;
+    const prices = trades.map(trade => trade.price.toNumber());
+    const latestPrice = prices[0];
+    const earliestPrice = prices[prices.length - 1];
+    return (latestPrice - earliestPrice) / earliestPrice;
   }
 
   /** 执行趋势修正交易 */
@@ -903,5 +989,297 @@ export class BotService implements OnModuleInit {
     } catch (error) {
       this.logger.error('执行趋势修正交易失败:', error);
     }
+  }
+
+  /** 更新市场情绪 */
+  private async updateMarketSentiment() {
+    try {
+      // 获取最近的交易数据来分析市场情绪
+      const recentTrades = await this.prisma.trade.findMany({
+        orderBy: { executedAt: 'desc' },
+        take: 30,
+        select: { price: true, quantity: true, executedAt: true },
+      });
+
+      if (recentTrades.length < 10) return;
+
+      // 计算价格波动性和交易量
+      const prices = recentTrades.map(trade => trade.price.toNumber());
+      const volumes = recentTrades.map(trade => trade.quantity);
+      
+      // 计算价格标准差（波动性指标）
+      const avgPrice = prices.reduce((sum, price) => sum + price, 0) / prices.length;
+      const priceVariance = prices.reduce((sum, price) => sum + Math.pow(price - avgPrice, 2), 0) / prices.length;
+      const priceStdDev = Math.sqrt(priceVariance);
+      const volatilityRatio = priceStdDev / avgPrice;
+
+      // 计算平均交易量
+      const avgVolume = volumes.reduce((sum, vol) => sum + vol, 0) / volumes.length;
+
+      // 计算价格趋势
+      const priceChange = this.calculatePriceChange(recentTrades);
+
+      // 基于多个因素更新市场情绪
+      let sentimentChange = 0;
+
+      // 价格趋势影响情绪
+      if (priceChange > 0.05) {
+        sentimentChange += 0.3; // 大涨提升情绪
+      } else if (priceChange > 0.02) {
+        sentimentChange += 0.15; // 小涨轻微提升
+      } else if (priceChange < -0.05) {
+        sentimentChange -= 0.3; // 大跌降低情绪
+      } else if (priceChange < -0.02) {
+        sentimentChange -= 0.15; // 小跌轻微降低
+      }
+
+      // 波动性影响情绪（高波动性通常降低情绪）
+      if (volatilityRatio > 0.03) {
+        sentimentChange -= 0.2;
+      } else if (volatilityRatio < 0.01) {
+        sentimentChange += 0.1; // 低波动性提升信心
+      }
+
+      // 交易量影响情绪
+      if (avgVolume > 50) {
+        sentimentChange += 0.1; // 高交易量提升情绪
+      } else if (avgVolume < 20) {
+        sentimentChange -= 0.1; // 低交易量降低情绪
+      }
+
+      // 添加随机因素，模拟市场情绪的不可预测性
+      sentimentChange += (Math.random() - 0.5) * 0.2;
+
+      // 应用情绪变化
+      this.marketSentiment += sentimentChange;
+
+      // 限制情绪在-1到1之间
+      this.marketSentiment = Math.max(-1, Math.min(1, this.marketSentiment));
+
+      // 情绪自然回归中性（防止极端情绪持续太久）
+      this.marketSentiment *= 0.95;
+
+      this.logger.log(
+        `市场情绪更新 - 价格变化:${(priceChange * 100).toFixed(1)}% 波动率:${(volatilityRatio * 100).toFixed(2)}% 情绪:${this.marketSentiment.toFixed(3)}`
+      );
+    } catch (error) {
+      this.logger.error('更新市场情绪失败:', error);
+    }
+  }
+
+  /** 更新波动性倍数 */
+  private async updateVolatility() {
+    try {
+      // 获取最近的交易数据
+      const recentTrades = await this.prisma.trade.findMany({
+        orderBy: { executedAt: 'desc' },
+        take: 20,
+        select: { price: true, executedAt: true },
+      });
+
+      if (recentTrades.length < 5) return;
+
+      // 计算最近的价格波动
+      const prices = recentTrades.map(trade => trade.price.toNumber());
+      const avgPrice = prices.reduce((sum, price) => sum + price, 0) / prices.length;
+      const priceVariance = prices.reduce((sum, price) => sum + Math.pow(price - avgPrice, 2), 0) / prices.length;
+      const currentVolatility = Math.sqrt(priceVariance) / avgPrice;
+
+      // 基于当前波动性和市场情绪调整波动性倍数
+      let targetVolatility = 1.0;
+
+      // 市场情绪影响波动性
+      if (Math.abs(this.marketSentiment) > 0.7) {
+        targetVolatility = 1.5; // 极端情绪增加波动性
+      } else if (Math.abs(this.marketSentiment) > 0.4) {
+        targetVolatility = 1.2; // 中等情绪适度增加波动性
+      } else {
+        targetVolatility = 0.8; // 平静情绪降低波动性
+      }
+
+      // 当前波动性影响
+      if (currentVolatility > 0.03) {
+        targetVolatility *= 0.7; // 已经高波动时降低目标
+      } else if (currentVolatility < 0.01) {
+        targetVolatility *= 1.3; // 低波动时增加目标
+      }
+
+      // 添加随机因素
+      targetVolatility *= (0.8 + Math.random() * 0.4); // 0.8-1.2倍随机调整
+
+      // 平滑过渡到目标波动性
+      this.volatilityMultiplier = this.volatilityMultiplier * 0.7 + targetVolatility * 0.3;
+
+      // 限制波动性倍数在合理范围内
+      this.volatilityMultiplier = Math.max(0.5, Math.min(2.0, this.volatilityMultiplier));
+
+      this.logger.log(
+        `波动性更新 - 当前波动:${(currentVolatility * 100).toFixed(2)}% 倍数:${this.volatilityMultiplier.toFixed(3)}`
+      );
+    } catch (error) {
+      this.logger.error('更新波动性失败:', error);
+    }
+  }
+
+  /** 检查随机事件 */
+  private async checkRandomEvents() {
+    try {
+      const now = Date.now();
+      
+      // 检查是否满足最小间隔要求
+      if (now - this.lastRandomEventTime < this.MIN_RANDOM_EVENT_INTERVAL) {
+        return;
+      }
+
+      // 检查是否触发随机事件
+      if (Math.random() < this.RANDOM_EVENT_PROBABILITY) {
+        await this.executeRandomEvent();
+        this.lastRandomEventTime = now;
+      }
+    } catch (error) {
+      this.logger.error('检查随机事件失败:', error);
+    }
+  }
+
+  /** 执行随机事件 */
+  private async executeRandomEvent() {
+    try {
+      const currentPrice = await this.getCurrentMarketPrice();
+      
+      // 随机事件类型
+      const eventTypes = [
+        'positive_news',    // 利好消息
+        'negative_news',    // 利空消息
+        'volume_spike',     // 交易量激增
+        'whale_trade',      // 大户交易
+        'market_shock'      // 市场震荡
+      ];
+
+      const eventType = eventTypes[Math.floor(Math.random() * eventTypes.length)];
+      
+      switch (eventType) {
+        case 'positive_news':
+          // 利好消息：价格突然上涨
+          await this.executeNewsEvent(true, 0.05, 0.15, 8);
+          this.logger.log('随机事件：利好消息发布，价格上涨');
+          break;
+
+        case 'negative_news':
+          // 利空消息：价格突然下跌
+          await this.executeNewsEvent(false, 0.03, 0.12, 6);
+          this.logger.log('随机事件：利空消息发布，价格下跌');
+          break;
+
+        case 'volume_spike':
+          // 交易量激增：大量订单
+          await this.executeVolumeSpike(12);
+          this.logger.log('随机事件：交易量激增');
+          break;
+
+        case 'whale_trade':
+          // 大户交易：单笔大额订单
+          await this.executeWhaleTradeEvent();
+          this.logger.log('随机事件：大户交易');
+          break;
+
+        case 'market_shock':
+          // 市场震荡：短期高波动
+          await this.executeMarketShock();
+          this.logger.log('随机事件：市场震荡');
+          break;
+      }
+    } catch (error) {
+      this.logger.error('执行随机事件失败:', error);
+    }
+  }
+
+  /** 执行新闻事件 */
+  private async executeNewsEvent(
+    isPositive: boolean,
+    minImpact: number,
+    maxImpact: number,
+    tradeCount: number
+  ) {
+    // 临时调整市场情绪和趋势偏向
+    const originalSentiment = this.marketSentiment;
+    const originalTrendBias = this.marketTrendBias;
+
+    const impact = minImpact + Math.random() * (maxImpact - minImpact);
+    
+    if (isPositive) {
+      this.marketSentiment = Math.min(1, this.marketSentiment + impact * 2);
+      this.marketTrendBias += impact;
+    } else {
+      this.marketSentiment = Math.max(-1, this.marketSentiment - impact * 2);
+      this.marketTrendBias -= impact;
+    }
+
+    // 执行相应的交易
+    await this.executeTrendCorrection(isPositive, tradeCount);
+
+    // 30秒后逐渐恢复
+    setTimeout(() => {
+      this.marketSentiment = originalSentiment;
+      this.marketTrendBias = originalTrendBias;
+    }, 30000);
+  }
+
+  /** 执行交易量激增事件 */
+  private async executeVolumeSpike(tradeCount: number) {
+    const currentPrice = await this.getCurrentMarketPrice();
+    
+    // 随机选择机器人执行大量交易
+    const selectedBots = this.botUsers
+      .sort(() => Math.random() - 0.5)
+      .slice(0, Math.min(tradeCount, this.botUsers.length));
+
+    for (const botUserId of selectedBots) {
+      const orderType = Math.random() < 0.5 ? OrderType.BUY : OrderType.SELL;
+      await this.placeLiquidityOrder(botUserId, orderType, currentPrice);
+      
+      // 短间隔下单，模拟激增
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  }
+
+  /** 执行大户交易事件 */
+  private async executeWhaleTradeEvent() {
+    const currentPrice = await this.getCurrentMarketPrice();
+    const randomBot = this.botUsers[Math.floor(Math.random() * this.botUsers.length)];
+    
+    // 大额订单（正常订单的5-10倍）
+    const orderType = Math.random() < 0.5 ? OrderType.BUY : OrderType.SELL;
+    const largeQuantity = Math.floor(Math.random() * 500) + 200; // 200-700股
+    
+    try {
+      await this.orderService.createOrder(
+        randomBot,
+        'AAPL',
+        orderType,
+        OrderMethod.MARKET,
+        currentPrice,
+        largeQuantity
+      );
+    } catch (error) {
+      this.logger.error('执行大户交易失败:', error);
+    }
+  }
+
+  /** 执行市场震荡事件 */
+  private async executeMarketShock() {
+    // 临时大幅增加波动性
+    const originalVolatility = this.volatilityMultiplier;
+    this.volatilityMultiplier = Math.min(2.0, this.volatilityMultiplier * 1.8);
+
+    // 执行多轮快速交易
+    for (let i = 0; i < 5; i++) {
+      await this.executeTrendCorrection(Math.random() < 0.5, 3);
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    // 2分钟后恢复正常波动性
+    setTimeout(() => {
+      this.volatilityMultiplier = originalVolatility;
+    }, 120000);
   }
 }
