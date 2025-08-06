@@ -1,5 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { authAPI, accountAPI, orderAPI, tradeAPI, positionAPI, botAPI } from '../utils/api';
+import {
+  authAPI,
+  accountAPI,
+  orderAPI,
+  tradeAPI,
+  positionAPI,
+  botAPI,
+} from '../utils/api';
 import { AxiosResponse } from 'axios';
 
 // 类型定义
@@ -127,7 +134,6 @@ export const useMarketData = () => {
     queryFn: () => tradeAPI.getMarketData(),
     staleTime: 1000, // 1秒内数据被认为是新鲜的
     gcTime: 60000, // 1分钟后清理缓存
-    refetchInterval: 5000, // 每5秒自动刷新
   });
 };
 
@@ -165,9 +171,10 @@ export const useBotStatus = () => {
 // Mutations
 export const useLogin = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: (data: { username: string; password: string }) => authAPI.login(data),
+    mutationFn: (data: { username: string; password: string }) =>
+      authAPI.login(data),
     onSuccess: () => {
       // 登录成功后，刷新账户信息
       queryClient.invalidateQueries({ queryKey: queryKeys.account });
@@ -177,13 +184,14 @@ export const useLogin = () => {
 
 export const useRegister = () => {
   return useMutation({
-    mutationFn: (data: { username: string; password: string }) => authAPI.register(data),
+    mutationFn: (data: { username: string; password: string }) =>
+      authAPI.register(data),
   });
 };
 
 export const useLogout = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: () => authAPI.logout(),
     onSuccess: () => {
@@ -195,10 +203,14 @@ export const useLogout = () => {
 
 export const useCreateOrder = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: (data: { type: string; method?: string; price: number; quantity: number }) => 
-      orderAPI.createOrder(data),
+    mutationFn: (data: {
+      type: string;
+      method?: string;
+      price: number;
+      quantity: number;
+    }) => orderAPI.createOrder(data),
     onSuccess: () => {
       // 创建订单成功后，刷新相关数据
       queryClient.invalidateQueries({ queryKey: queryKeys.myOrders });
@@ -210,7 +222,7 @@ export const useCreateOrder = () => {
 
 export const useCancelOrder = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: (id: string) => orderAPI.cancelOrder(id),
     onSuccess: () => {
@@ -222,7 +234,7 @@ export const useCancelOrder = () => {
 
 export const useStartBotTrading = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: () => botAPI.startBotTrading(),
     onSuccess: () => {
@@ -234,7 +246,7 @@ export const useStartBotTrading = () => {
 
 export const useStopBotTrading = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: () => botAPI.stopBotTrading(),
     onSuccess: () => {
@@ -247,13 +259,19 @@ export const useStopBotTrading = () => {
 // 刷新方法
 export const useRefreshQueries = () => {
   const queryClient = useQueryClient();
-  
+
   return {
-    refreshAccount: () => queryClient.invalidateQueries({ queryKey: queryKeys.account }),
-    refreshOrders: () => queryClient.invalidateQueries({ queryKey: queryKeys.myOrders }),
-    refreshTrades: () => queryClient.invalidateQueries({ queryKey: queryKeys.myTrades }),
-    refreshPositions: () => queryClient.invalidateQueries({ queryKey: queryKeys.positions }),
-    refreshBotStatus: () => queryClient.invalidateQueries({ queryKey: queryKeys.botStatus }),
-    refreshMarketData: () => queryClient.invalidateQueries({ queryKey: queryKeys.marketData }),
+    refreshAccount: () =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.account }),
+    refreshOrders: () =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.myOrders }),
+    refreshTrades: () =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.myTrades }),
+    refreshPositions: () =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.positions }),
+    refreshBotStatus: () =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.botStatus }),
+    refreshMarketData: () =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.marketData }),
   };
 };

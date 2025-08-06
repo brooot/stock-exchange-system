@@ -14,10 +14,16 @@ export class BotService implements OnModuleInit {
   // 配置参数
   private readonly BOT_COUNT = 10; // 机器人数量
   private readonly TRADE_INTERVAL = 1000; // 交易间隔（毫秒）
-  private readonly PRICE_VARIANCE = 0.5; // 价格波动范围（50%，减少极端价格偏离）
+  private readonly PRICE_VARIANCE = 0.3; // 价格波动范围（30%，减少极端价格偏离）
   private readonly ORDER_TIMEOUT = 1000000; // 订单超时时间 ms
   private readonly MIN_ORDER_SIZE = 1; // 最小订单数量
   private readonly MAX_ORDER_SIZE = 100; // 最大订单数量（减小以增加交易频率）
+
+  // 新增：长期趋势控制参数
+  private readonly LONG_TERM_BULL_BIAS = 0.15; // 长期看涨偏向（15%）
+  private readonly TREND_CHECK_INTERVAL = 300000; // 趋势检查间隔（5分钟）
+  private trendCheckIntervalId: NodeJS.Timeout | null = null;
+  private marketTrendBias = 0; // 市场趋势偏向：正值看涨，负值看跌
 
   // 资金和持仓管理配置
   private readonly MIN_BALANCE_THRESHOLD = 1000; // 最低资金阈值
@@ -74,6 +80,11 @@ export class BotService implements OnModuleInit {
         await this.performHealthCheck();
       }, this.HEALTH_CHECK_INTERVAL);
 
+      // 启动趋势检查
+      this.trendCheckIntervalId = setInterval(async () => {
+        await this.checkLongTermTrend();
+      }, this.TREND_CHECK_INTERVAL);
+
       this.logger.log('机器人交易系统已启动');
       return { success: true, message: '机器人交易系统已启动' };
     } catch (error) {
@@ -98,6 +109,11 @@ export class BotService implements OnModuleInit {
     if (this.healthCheckIntervalId) {
       clearInterval(this.healthCheckIntervalId);
       this.healthCheckIntervalId = null;
+    }
+
+    if (this.trendCheckIntervalId) {
+      clearInterval(this.trendCheckIntervalId);
+      this.trendCheckIntervalId = null;
     }
 
     // 取消所有机器人的未完成订单
@@ -264,13 +280,14 @@ export class BotService implements OnModuleInit {
         orderType = OrderType.BUY;
       } else {
         // 两种操作都可以时，使用更平衡的策略
-        let buyProbability = 0.5;
+        let buyProbability =
+          0.5 + this.LONG_TERM_BULL_BIAS + this.marketTrendBias;
 
         // 基于持仓调整概率 - 更激进的平衡策略
         if (holdingQuantity > 150) {
           buyProbability = 0.2; // 持仓多时强烈倾向卖出
         } else if (holdingQuantity < 150) {
-          buyProbability = 0.6; // 持仓少时适度倾向买入
+          buyProbability = 0.6 + this.LONG_TERM_BULL_BIAS; // 持仓少时适度倾向买入，加上看涨偏向
         }
 
         // 基于盈亏调整概率 - 增强盈利卖出倾向
@@ -279,9 +296,9 @@ export class BotService implements OnModuleInit {
           buyProbability -= 0.4; // 盈利5%以上时强烈倾向卖出
         } else if (profitRatio > 1.02) {
           buyProbability -= 0.3; // 盈利2%以上时倾向卖出
-        } else if (profitRatio < 0.95) {
-          buyProbability += 0.3; // 亏损5%以上时倾向买入
-        } else if (profitRatio < 0.98) {
+        } else if (profitRatio < 0.965) {
+          buyProbability += 0.4; // 亏损5%以上时倾向买入
+        } else if (profitRatio < 0.985) {
           buyProbability += 0.1; // 轻微亏损时略微倾向买入
         }
 
@@ -327,10 +344,10 @@ export class BotService implements OnModuleInit {
           quantity
         );
 
-        const priceDeviation =
-          orderMethod === OrderMethod.MARKET
-            ? 0
-            : Math.abs(((orderPrice - currentPrice) / currentPrice) * 100);
+        // const priceDeviation =
+        //   orderMethod === OrderMethod.MARKET
+        //     ? 0
+        //     : Math.abs(((orderPrice - currentPrice) / currentPrice) * 100);
       }
     } catch (error) {
       this.logger.error(`机器人 ${botUserId} 下单失败:`, error);
@@ -434,7 +451,7 @@ export class BotService implements OnModuleInit {
     };
   }
 
-  /** 生成流动性订单的价格和数量（偏向更接近市价） */
+  /** 生成流动性的价格和数量（偏向更接近市价） */
   private generateLiquidityPriceAndQuantity(
     orderType: OrderType,
     currentPrice: number,
@@ -473,8 +490,8 @@ export class BotService implements OnModuleInit {
       };
     }
 
-    // 限价单：流动性订单偏向更接近市价，偏离度较小
-    const maxDeviation = (this.PRICE_VARIANCE / 100) * 0.4; // 流动性订单使用40%的价格波动范围
+    // 限价单：流动订单偏向更接近市价，偏离度较小
+    const maxDeviation = (this.PRICE_VARIANCE / 100) * 0.4; // 流动订单使用40%的价格波动范围
     const minDeviation = 0.0005; // 最小0.05%偏离
 
     // 使用更陡峭的指数分布，让价格更集中在市价附近
@@ -496,7 +513,7 @@ export class BotService implements OnModuleInit {
 
     orderPrice = Math.max(0.01, orderPrice);
 
-    // 流动性订单的数量策略：偏离度越大，数量稍微增加，但增幅较小
+    // 流动订单的数量策略：偏离度越大，数量稍微增加，但增幅较小
     const deviationRatio = clampedDeviation / maxDeviation; // 0-1之间
     const baseQuantity = this.MIN_ORDER_SIZE;
     const maxQuantityMultiplier = 5; // 较小的数量倍数
@@ -655,8 +672,8 @@ export class BotService implements OnModuleInit {
       const priceChange = prices[0] - prices[prices.length - 1];
       const changePercent = Math.abs(priceChange) / prices[prices.length - 1];
 
-      // 如果价格单向变化超过5%，触发反向交易
-      if (changePercent > 0.05) {
+      // 如果价格单向变化超过3%，触发反向交易（从5%降低到3%）
+      if (changePercent > 0.03) {
         const isRising = priceChange > 0;
         await this.executeBalancingTrades(isRising);
         this.logger.debug(
@@ -725,7 +742,7 @@ export class BotService implements OnModuleInit {
     }
   }
 
-  /** 下流动性订单 */
+  /** 下流动订单 */
   private async placeLiquidityOrder(
     botUserId: number,
     orderType: OrderType,
@@ -740,7 +757,7 @@ export class BotService implements OnModuleInit {
       const balance = user.balance.toNumber();
       const holdingQuantity = position ? position.quantity : 0;
 
-      // 流动性订单也使用概率分布策略，但偏向更接近市价
+      // 流动订单也使用概率分布策略，但偏向更接近市价
       const { orderPrice, quantity, orderMethod } =
         this.generateLiquidityPriceAndQuantity(
           orderType,
@@ -750,7 +767,7 @@ export class BotService implements OnModuleInit {
         );
 
       if (!orderPrice || !quantity) {
-        return; // 无法生成有效的流动性订单
+        return; // 无法生成有效的流动订单
       }
 
       const canPlaceOrder = await this.checkBotCanPlaceOrder(
@@ -771,7 +788,7 @@ export class BotService implements OnModuleInit {
         );
       }
     } catch (error) {
-      this.logger.error(`机器人 ${botUserId} 下流动性订单失败:`, error);
+      this.logger.error(`机器人 ${botUserId} 下流动订单失败:`, error);
     }
   }
 
@@ -789,6 +806,102 @@ export class BotService implements OnModuleInit {
       this.logger.log('已取消所有机器人订单');
     } catch (error) {
       this.logger.error('取消机器人订单失败:', error);
+    }
+  }
+
+  /** 长期趋势检查机制 */
+  private async checkLongTermTrend() {
+    try {
+      // 获取过去30分钟的交易记录
+      const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+      const longTermTrades = await this.prisma.trade.findMany({
+        where: {
+          executedAt: { gte: thirtyMinutesAgo },
+        },
+        orderBy: { executedAt: 'desc' },
+        take: 50,
+        select: { price: true, executedAt: true },
+      });
+
+      if (longTermTrades.length < 10) return;
+
+      // 计算长期价格变化
+      const prices = longTermTrades.map((trade) => trade.price.toNumber());
+      const latestPrice = prices[0];
+      const earliestPrice = prices[prices.length - 1];
+      const longTermChange = (latestPrice - earliestPrice) / earliestPrice;
+
+      // 动态调整市场趋势偏向，实现波浪上升效果
+      const trendAdjustment = longTermChange * 0.5; // 基于趋势变化的调整幅度
+
+      // 根据趋势方向调整marketTrendBias
+      if (longTermChange < -0.1) {
+        // 大幅下跌时增加看涨偏向
+        this.marketTrendBias += 0.2;
+        this.logger.log(
+          `检测到长期下跌${(Math.abs(longTermChange) * 100).toFixed(
+            2
+          )}%，增加买入压力，当前偏向: ${this.marketTrendBias.toFixed(3)}`
+        );
+        await this.executeTrendCorrection(true, 5);
+      } else if (longTermChange > 0.15) {
+        // 大幅上涨时减少看涨偏向，允许适度回调
+        this.marketTrendBias -= 0.15;
+        this.logger.log(
+          `检测到长期上涨${(longTermChange * 100).toFixed(
+            2
+          )}%，适度减少看涨偏向，当前偏向: ${this.marketTrendBias.toFixed(3)}`
+        );
+        await this.executeTrendCorrection(false, 2);
+      } else if (longTermChange > 0.05) {
+        // 温和上涨时轻微减少看涨偏向
+        this.marketTrendBias -= 0.05;
+      } else if (longTermChange < -0.03) {
+        // 温和下跌时轻微增加看涨偏向
+        this.marketTrendBias += 0.08;
+      } else {
+        // 价格相对稳定时保持当前偏向，但向长期看涨方向微调
+        this.marketTrendBias += 0.02;
+      }
+
+      // 限制marketTrendBias在合理范围内，避免极端偏向
+      this.marketTrendBias = Math.max(
+        -0.2,
+        Math.min(0.4, this.marketTrendBias)
+      );
+
+      this.logger.log(
+        `趋势检查完成 - 价格变化: ${(longTermChange * 100).toFixed(
+          2
+        )}%, 市场偏向: ${this.marketTrendBias.toFixed(3)}`
+      );
+    } catch (error) {
+      this.logger.error('长期趋势检查失败:', error);
+    }
+  }
+
+  /** 执行趋势修正交易 */
+  private async executeTrendCorrection(
+    isBuyCorrection: boolean,
+    tradeCount: number
+  ) {
+    try {
+      // 随机选择机器人执行修正交易
+      const selectedBots = this.botUsers
+        .sort(() => Math.random() - 0.5)
+        .slice(0, Math.min(tradeCount, this.botUsers.length));
+
+      const currentPrice = await this.getCurrentMarketPrice();
+
+      for (const botUserId of selectedBots) {
+        const orderType = isBuyCorrection ? OrderType.BUY : OrderType.SELL;
+        await this.placeLiquidityOrder(botUserId, orderType, currentPrice);
+
+        // 间隔一小段时间，避免同时下单
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      }
+    } catch (error) {
+      this.logger.error('执行趋势修正交易失败:', error);
     }
   }
 }

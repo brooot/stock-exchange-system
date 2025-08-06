@@ -2,8 +2,12 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Card, Form, Input, Button, Tabs, Alert, Typography } from 'antd';
+import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { useToast } from '../../hooks/useToast';
 import { useLogin, useRegister } from '../../hooks/useApiQueries';
+
+const { Title, Text } = Typography;
 
 interface LoginForm {
   username: string;
@@ -16,13 +20,25 @@ interface RegisterForm {
   confirmPassword: string;
 }
 
+// 公共输入框配置
+const inputConfig = {
+  size: 'large' as const,
+  style: { backgroundColor: 'transparent' },
+};
+
+// 公共表单配置
+const formConfig = {
+  autoComplete: 'off',
+  layout: 'vertical' as const,
+};
+
 export default function AuthPage() {
-  const [isLogin, setIsLogin] = useState(true);
-  const [loginForm, setLoginForm] = useState<LoginForm>({ username: '', password: '' });
-  const [registerForm, setRegisterForm] = useState<RegisterForm>({ username: '', password: '', confirmPassword: '' });
   const [error, setError] = useState('');
+  const [activeKey, setActiveKey] = useState('login');
   const router = useRouter();
-  const { showSuccess, showError } = useToast();
+  const { showSuccess } = useToast();
+  const [loginForm] = Form.useForm<LoginForm>();
+  const [registerForm] = Form.useForm<RegisterForm>();
 
   // 使用 TanStack Query mutations
   const loginMutation = useLogin();
@@ -30,11 +46,9 @@ export default function AuthPage() {
 
   const loading = loginMutation.isPending || registerMutation.isPending;
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleLogin = async (values: LoginForm) => {
     setError('');
-
-    loginMutation.mutate(loginForm, {
+    loginMutation.mutate(values, {
       onSuccess: (response) => {
         // token现在存储在httpOnly cookie中，不需要手动存储
         localStorage.setItem('username', response.data.username);
@@ -48,23 +62,18 @@ export default function AuthPage() {
     });
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleRegister = async (values: RegisterForm) => {
     setError('');
 
-    if (registerForm.password !== registerForm.confirmPassword) {
-      setError('密码确认不匹配');
-      return;
-    }
-
     registerMutation.mutate({
-      username: registerForm.username,
-      password: registerForm.password,
+      username: values.username,
+      password: values.password,
     }, {
       onSuccess: () => {
         showSuccess('注册成功！请登录');
-        setIsLogin(true);
-        setRegisterForm({ username: '', password: '', confirmPassword: '' });
+        registerForm.resetFields();
+        // 注册成功后，切换到登录tab
+        setActiveKey('login');
       },
       onError: (err: any) => {
         const errorMessage = err.response?.data?.message || '注册失败';
@@ -73,123 +82,162 @@ export default function AuthPage() {
     });
   };
 
+  const tabItems = [
+    {
+      key: 'login',
+      label: '登录',
+      children: (
+        <Form
+          form={loginForm}
+          name="login"
+          onFinish={handleLogin}
+          {...formConfig}
+        >
+          <Form.Item
+            label="用户名"
+            name="username"
+            rules={[{ required: true, message: '请输入用户名!' }]}
+          >
+            <Input
+              prefix={<UserOutlined />}
+              placeholder="请输入用户名"
+              {...inputConfig}
+            />
+          </Form.Item>
+
+          <Form.Item
+            label="密码"
+            name="password"
+            rules={[{ required: true, message: '请输入密码!' }]}
+          >
+            <Input.Password
+              prefix={<LockOutlined />}
+              placeholder="请输入密码"
+              {...inputConfig}
+            />
+          </Form.Item>
+
+          <Form.Item>
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={loading}
+              size="large"
+              block
+            >
+              {loading ? '登录中...' : '登录'}
+            </Button>
+          </Form.Item>
+        </Form>
+      ),
+    },
+    {
+      key: 'register',
+      label: '注册',
+      children: (
+        <Form
+          form={registerForm}
+          name="register"
+          onFinish={handleRegister}
+          {...formConfig}
+        >
+          <Form.Item
+            label="用户名"
+            name="username"
+            rules={[{ required: true, message: '请输入用户名!' }]}
+          >
+            <Input
+              prefix={<UserOutlined />}
+              placeholder="请输入用户名"
+              {...inputConfig}
+            />
+          </Form.Item>
+
+          <Form.Item
+            label="密码"
+            name="password"
+            rules={[{ required: true, message: '请输入密码!' }]}
+          >
+            <Input.Password
+              prefix={<LockOutlined />}
+              placeholder="请输入密码"
+              {...inputConfig}
+            />
+          </Form.Item>
+
+          <Form.Item
+            label="确认密码"
+            name="confirmPassword"
+            dependencies={['password']}
+            rules={[
+              { required: true, message: '请确认密码!' },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (!value || getFieldValue('password') === value) {
+                    return Promise.resolve();
+                  }
+                  return Promise.reject(new Error('两次输入的密码不一致!'));
+                },
+              }),
+            ]}
+          >
+            <Input.Password
+              prefix={<LockOutlined />}
+              placeholder="请确认密码"
+              {...inputConfig}
+            />
+          </Form.Item>
+
+          <Form.Item>
+            <Button
+              type="primary"
+              htmlType="submit"
+              loading={loading}
+              size="large"
+              block
+            >
+              {loading ? '注册中...' : '注册'}
+            </Button>
+          </Form.Item>
+        </Form>
+      ),
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-lg shadow-xl p-8">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">股票交易系统</h1>
-          <p className="text-gray-600">欢迎使用专业交易平台</p>
-        </div>
-
-        <div className="flex mb-6">
-          <button
-            className={`flex-1 py-2 px-4 text-center font-medium rounded-l-lg ${isLogin
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
-            onClick={() => setIsLogin(true)}
-          >
-            登录
-          </button>
-          <button
-            className={`flex-1 py-2 px-4 text-center font-medium rounded-r-lg ${!isLogin
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
-            onClick={() => setIsLogin(false)}
-          >
-            注册
-          </button>
+      <Card
+        className="w-full max-w-md"
+        style={{ boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)' }}
+      >
+        <div className="text-center mb-6">
+          <Title level={2} style={{ marginBottom: 8 }}>
+            股票交易系统
+          </Title>
+          <Text type="secondary">欢迎使用专业交易平台</Text>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
-            {error}
-          </div>
+          <Alert
+            message={error}
+            type="error"
+            showIcon
+            style={{ marginBottom: 16 }}
+            closable
+            onClose={() => setError('')}
+          />
         )}
 
-        {isLogin ? (
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                用户名
-              </label>
-              <input
-                type="text"
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={loginForm.username}
-                onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                密码
-              </label>
-              <input
-                type="password"
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={loginForm.password}
-                onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-            >
-              {loading ? '登录中...' : '登录'}
-            </button>
-          </form>
-        ) : (
-          <form onSubmit={handleRegister} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                用户名
-              </label>
-              <input
-                type="text"
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={registerForm.username}
-                onChange={(e) => setRegisterForm({ ...registerForm, username: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                密码
-              </label>
-              <input
-                type="password"
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={registerForm.password}
-                onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                确认密码
-              </label>
-              <input
-                type="password"
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={registerForm.confirmPassword}
-                onChange={(e) => setRegisterForm({ ...registerForm, confirmPassword: e.target.value })}
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-            >
-              {loading ? '注册中...' : '注册'}
-            </button>
-          </form>
-        )}
-      </div>
+        <Tabs
+          activeKey={activeKey}
+          items={tabItems}
+          centered
+          onChange={(key) => {
+            setActiveKey(key);
+            setError('');
+          }}
+        />
+      </Card>
     </div>
   );
 }

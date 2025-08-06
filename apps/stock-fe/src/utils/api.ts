@@ -18,8 +18,8 @@ api.interceptors.response.use(
   (error: AxiosError) => {
     // 统一处理401未认证错误
     if (error.response?.status === 401) {
-      // 跳转到登录页
-      if (typeof window !== 'undefined') {
+      // 只有当用户不在登录页面时才跳转到登录页
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/auth')) {
         window.location.href = '/auth';
       }
     }

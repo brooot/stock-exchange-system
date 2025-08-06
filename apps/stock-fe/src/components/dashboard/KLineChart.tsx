@@ -106,12 +106,26 @@ const KLineChart = React.memo(function KLineChart({
   const updateThrottleRef = useRef<NodeJS.Timeout | null>(null);
   const pendingUpdatesRef = useRef<Map<string, KlineData>>(new Map());
 
+
+
   // 组件状态
   const [isChartReady, setIsChartReady] = useState(false);
   const [echartsLoaded, setEchartsLoaded] = useState(false);
   const [currentInterval, setCurrentInterval] = useState(initialInterval);
   const [klineData, setKlineData] = useState<Record<string, KlineData[]>>({});
   const [isConnected, setIsConnected] = useState(false);
+
+  // 使用ref保存最新的symbol和currentInterval值，避免WebSocket重新连接
+  const symbolRef = useRef(symbol);
+  const currentIntervalRef = useRef(currentInterval);
+  // 更新ref值
+  useEffect(() => {
+    symbolRef.current = symbol;
+  }, [symbol]);
+
+  useEffect(() => {
+    currentIntervalRef.current = currentInterval;
+  }, [currentInterval]);
 
   // 动态加载ECharts库和组件
   useEffect(() => {
@@ -281,17 +295,33 @@ const KLineChart = React.memo(function KLineChart({
     [throttledUpdate]
   );
 
+  // 获取时间间隔对应的毫秒数
+  const getIntervalInMs = useCallback((interval: string): number => {
+    const intervalMap: Record<string, number> = {
+      '1m': 60 * 1000,
+      '5m': 5 * 60 * 1000,
+      '15m': 15 * 60 * 1000,
+      '1h': 60 * 60 * 1000,
+      '1d': 24 * 60 * 60 * 1000,
+    };
+    return intervalMap[interval] || 60 * 1000;
+  }, []);
+
   // 处理价格更新事件（用于实时价格显示）
   const handlePriceUpdate = useCallback((priceUpdate: PriceUpdateEvent) => {
     const { symbol: updateSymbol, price, volume, timestamp } = priceUpdate;
 
+    // 通过ref获取最新的symbol和currentInterval值
+    const currentSymbol = symbolRef.current;
+    const currentIntervalValue = currentIntervalRef.current;
+
     // 只处理当前股票的价格更新
-    if (updateSymbol !== symbol) return;
+    if (updateSymbol !== currentSymbol) return;
 
     // 更新当前时间周期的最后一根K线数据
     setKlineData(prevData => {
       const newData = { ...prevData };
-      const currentData = newData[currentInterval] || [];
+      const currentData = newData[currentIntervalValue] || [];
 
       if (currentData.length === 0) return prevData;
 
@@ -300,7 +330,7 @@ const KLineChart = React.memo(function KLineChart({
       const updateTime = new Date(timestamp).getTime();
 
       // 判断是否应该更新最后一根K线（基于时间间隔）
-      const intervalMs = getIntervalInMs(currentInterval);
+      const intervalMs = getIntervalInMs(currentIntervalValue);
       const klineStartTime = Math.floor(lastKline.timestamp / intervalMs) * intervalMs;
       const currentKlineEndTime = klineStartTime + intervalMs;
 
@@ -315,24 +345,14 @@ const KLineChart = React.memo(function KLineChart({
         // 替换最后一根K线
         const updatedData = [...currentData];
         updatedData[updatedData.length - 1] = lastKline;
-        newData[currentInterval] = updatedData;
+        newData[currentIntervalValue] = updatedData;
       }
 
       return newData;
     });
-  }, [symbol, currentInterval]);
+  }, [getIntervalInMs]);
 
-  // 获取时间间隔对应的毫秒数
-  const getIntervalInMs = useCallback((interval: string): number => {
-    const intervalMap: Record<string, number> = {
-      '1m': 60 * 1000,
-      '5m': 5 * 60 * 1000,
-      '15m': 15 * 60 * 1000,
-      '1h': 60 * 60 * 1000,
-      '1d': 24 * 60 * 60 * 1000,
-    };
-    return intervalMap[interval] || 60 * 1000;
-  }, []);
+
 
   // 初始化WebSocket连接
   useEffect(() => {
@@ -373,7 +393,7 @@ const KLineChart = React.memo(function KLineChart({
       }
       socket.disconnect();
     };
-  }, [handleKlineUpdate, handlePriceUpdate]);
+  }, []); // 移除依赖项，避免WebSocket重新连接
 
   // TanStack Query 会自动处理时间周期变化时的数据获取
 
@@ -496,7 +516,52 @@ const KLineChart = React.memo(function KLineChart({
     };
   }, [klineData, currentInterval]);
 
-  // 更新图表数据和配置
+  // 初始化图表的dataZoom配置（只在图表首次准备好时设置）
+  const isDataZoomInitialized = useRef(false);
+
+  useEffect(() => {
+    if (!chartInstance.current || !isChartReady || !chartData || isDataZoomInitialized.current) return;
+
+    const { klineData } = chartData;
+    const currentData = klineData || [];
+
+    if (currentData.length === 0) return;
+
+    // 设置初始dataZoom配置
+    const dataZoomOption = {
+      dataZoom: [
+        {
+          type: 'inside',
+          xAxisIndex: [0, 1],
+          start: currentData.length <= 50 ? 0 : Math.max(0, 100 - (100 / currentData.length) * 50),
+          end: 100
+        },
+        {
+          show: true,
+          xAxisIndex: [0, 1],
+          type: 'slider',
+          top: '85%',
+          start: currentData.length <= 50 ? 0 : Math.max(0, 100 - (100 / currentData.length) * 50),
+          end: 100
+        }
+      ]
+    };
+
+    chartInstance.current.setOption(dataZoomOption, {
+      notMerge: false,
+      lazyUpdate: true,
+      silent: false
+    });
+
+    isDataZoomInitialized.current = true;
+  }, [isChartReady, chartData]);
+
+  // 重置dataZoom初始化状态当时间周期改变时
+  useEffect(() => {
+    isDataZoomInitialized.current = false;
+  }, [currentInterval]);
+
+  // 更新图表数据和配置（不包含dataZoom）
   useEffect(() => {
     if (!chartInstance.current || !isChartReady || !chartData) return;
 
@@ -509,14 +574,10 @@ const KLineChart = React.memo(function KLineChart({
     updateTimeoutRef.current = setTimeout(() => {
       if (!chartInstance.current || !chartData) return;
 
-      // 清除之前的图表内容，防止数据重叠
-      chartInstance.current.clear();
-
       const { timestamps = [], klineData, volumeData, movingAverages } = chartData;
       const { ma5, ma10, ma20, ma30 } = movingAverages;
-      const currentData = klineData || [];
 
-      // 构建ECharts配置选项
+      // 构建ECharts配置选项（不包含dataZoom）
       const chartOption: any = {
         animation: false,
         legend: {
@@ -623,22 +684,6 @@ const KLineChart = React.memo(function KLineChart({
             splitLine: { show: false }
           }
         ],
-        dataZoom: [
-          {
-            type: 'inside',
-            xAxisIndex: [0, 1],
-            start: currentData.length <= 50 ? 0 : Math.max(0, 100 - (100 / currentData.length) * 50),
-            end: 100
-          },
-          {
-            show: true,
-            xAxisIndex: [0, 1],
-            type: 'slider',
-            top: '85%',
-            start: currentData.length <= 50 ? 0 : Math.max(0, 100 - (100 / currentData.length) * 50),
-            end: 100
-          }
-        ],
         visualMap: {
           show: false,
           seriesIndex: 5,
@@ -720,11 +765,11 @@ const KLineChart = React.memo(function KLineChart({
         ]
       };
 
-      // 使用clear() + setOption()确保完全重新渲染，避免数据重叠
+      // 使用merge模式更新图表，保持交互状态
       chartInstance.current.setOption(chartOption, {
-        notMerge: true,
-        lazyUpdate: false,
-        silent: true
+        notMerge: false,
+        lazyUpdate: true,
+        silent: false
       });
     }, 50); // 50ms防抖延迟
 
@@ -835,6 +880,7 @@ const KLineChart = React.memo(function KLineChart({
 
       {/* ECharts图表容器 */}
       <div
+        key="KLineChart"
         ref={chartRef}
         className={`w-full h-96 ${(isLoading || !echartsLoaded) ? 'hidden' : ''}`}
         style={{ minHeight: '400px' }}

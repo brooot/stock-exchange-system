@@ -1,3 +1,4 @@
+import 'antd/dist/reset.css';
 import './global.css';
 import Layout from '../components/Layout';
 import QueryProvider from '../components/QueryProvider';

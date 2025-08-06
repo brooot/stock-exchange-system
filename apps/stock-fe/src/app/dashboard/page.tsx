@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import Decimal from 'decimal.js';
 import { useAccountInfo, useUserPositions, useCreateOrder } from '../../hooks/useApiQueries';
 import { useWebSocket } from '../../hooks/useWebSocket';
@@ -38,13 +38,18 @@ export default function DashboardPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const accountInfo = accountResponse?.data ? {
-    balance: accountResponse.data.balance.toString()
-  } : null;
-  const positions = (positionsResponse?.data || []).map((position, index) => ({
-    ...position,
-    id: `${position.symbol}-${index}` // 为每个持仓添加唯一 id
-  }));
+  const accountInfo = useMemo(() => {
+    return accountResponse?.data ? {
+      balance: accountResponse.data.balance.toString()
+    } : null;
+  }, [accountResponse?.data]);
+
+  const positions = useMemo(() => {
+    return (positionsResponse?.data || []).map((position, index) => ({
+      ...position,
+      id: `${position.symbol}-${index}` // 为每个持仓添加唯一 id
+    }));
+  }, [positionsResponse?.data]);
 
   // 当持仓更新时，重新计算投资组合价值
   useEffect(() => {
@@ -73,7 +78,25 @@ export default function DashboardPage() {
   };
 
 
+  // 稳定KLineChart的props
+  const klineChartProps = useMemo(() => ({
+    symbol: "AAPL" as const,
+    initialInterval: "1m" as const
+  }), []);
 
+  // 稳定TradingPanel的onCreateOrder回调
+  const handleCreateOrder = useCallback(async (orderData: any) => {
+    setError('');
+    setSuccess('');
+
+    try {
+      await createOrderMutation.mutateAsync(orderData);
+      setSuccess('订单提交成功！');
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.message || '订单提交失败';
+      setError(errorMessage);
+    }
+  }, [createOrderMutation]);
 
 
 
@@ -103,24 +126,13 @@ export default function DashboardPage() {
           </div>
 
           <KLineChart
-            symbol="AAPL"
-            initialInterval="1m"
+            symbol={klineChartProps.symbol}
+            initialInterval={klineChartProps.initialInterval}
           />
 
           <TradingPanel
             marketData={marketData}
-            onCreateOrder={async (orderData) => {
-              setError('');
-              setSuccess('');
-
-              try {
-                await createOrderMutation.mutateAsync(orderData);
-                setSuccess('订单提交成功！');
-              } catch (err: any) {
-                const errorMessage = err.response?.data?.message || '订单提交失败';
-                setError(errorMessage);
-              }
-            }}
+            onCreateOrder={handleCreateOrder}
             isLoading={createOrderMutation.isPending}
             error={error}
             success={success}

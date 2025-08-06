@@ -32,11 +32,15 @@ export const useWebSocket = () => {
   // 使用 TanStack Query 获取初始市场数据
   const { data: marketDataResponse } = useMarketData();
 
+  // 设置初始市场数据的独立effect
   useEffect(() => {
-    // 设置初始市场数据
     if (marketDataResponse?.data) {
       setMarketData(marketDataResponse.data);
     }
+  }, [marketDataResponse?.data]);
+
+  // WebSocket连接的独立effect
+  useEffect(() => {
     // 连接到WebSocket服务器
     const socket = io(
       `http://${process.env.NEXT_PUBLIC_BACKEND_HOST}:${process.env.NEXT_PUBLIC_BACKEND_PORT}/market`,
@@ -79,7 +83,7 @@ export const useWebSocket = () => {
     return () => {
       socket.disconnect();
     };
-  }, []);
+  }, []); // 空依赖数组，只在组件挂载时执行一次
 
   return {
     marketData,
