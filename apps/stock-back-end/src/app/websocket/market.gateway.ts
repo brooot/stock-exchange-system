@@ -6,15 +6,11 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Logger } from '@nestjs/common';
+import { getCorsOrigins } from '../../utils/cors-config';
 
 @WebSocketGateway({
   cors: {
-    origin: [
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://121.199.170.204:3000', // 添加生产环境前端地址
-      'http://121.199.170.204:3001', // 添加生产环境后端地址
-    ],
+    origin: getCorsOrigins(),
     credentials: true,
   },
   namespace: '/market',

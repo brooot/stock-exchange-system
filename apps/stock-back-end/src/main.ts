@@ -7,6 +7,7 @@ import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app/app.module';
 import cookieParser from 'cookie-parser';
+import { getCorsOrigins } from './utils/cors-config';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -14,14 +15,11 @@ async function bootstrap() {
   // 配置 cookie-parser 中间件
   app.use(cookieParser());
 
-  // 配置 CORS
+  // 配置 CORS - 根据环境区分
+  const corsOrigins = getCorsOrigins();
+
   app.enableCors({
-    origin: [
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://121.199.170.204:3000', // 添加生产环境前端地址
-      'http://121.199.170.204:3001', // 添加生产环境后端地址
-    ],
+    origin: corsOrigins,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true, // 允许携带认证信息
@@ -34,7 +32,8 @@ async function bootstrap() {
   Logger.log(
     `🚀 Application is running on: http://localhost:${port}/${globalPrefix}`
   );
-  Logger.log(`🌐 CORS enabled for frontend ports: 3000, 3001`);
+  Logger.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  Logger.log(`🌐 CORS enabled for origins: ${corsOrigins.join(', ')}`);
 }
 
 bootstrap();

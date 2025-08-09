@@ -75,7 +75,7 @@ fi
 # 构建前端镜像
 echo -e "${GREEN}🔨 构建前端镜像...${NC}"
 # 使用环境变量，如果未设置则使用默认值
-BACKEND_HOST=${NEXT_PUBLIC_BACKEND_HOST:-"121.199.170.204"}
+BACKEND_HOST=${NEXT_PUBLIC_BACKEND_HOST:-"www.brooot.top"}
 BACKEND_PORT=${NEXT_PUBLIC_BACKEND_PORT:-"3001"}
 echo -e "${YELLOW}📋 前端配置: ${BACKEND_HOST}:${BACKEND_PORT}${NC}"
 docker build --platform linux/amd64 \
