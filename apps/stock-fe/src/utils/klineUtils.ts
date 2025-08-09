@@ -13,8 +13,8 @@ export const DEFAULT_INTERVALS = [
 
 // K线图颜色配置
 export const CHART_COLORS = {
-  up: '#00da3c',    // 上涨颜色（绿色）
-  down: '#ec0000'   // 下跌颜色（红色）
+  up: '#00da3c', // 上涨颜色（绿色）
+  down: '#ec0000', // 下跌颜色（红色）
 } as const;
 
 /**
@@ -23,7 +23,10 @@ export const CHART_COLORS = {
  * @param klineData K线数据数组，格式为 [open, close, low, high]
  * @returns 移动平均线数据数组
  */
-export function calculateMovingAverage(period: number, klineData: number[][]): (number | string)[] {
+export function calculateMovingAverage(
+  period: number,
+  klineData: number[][]
+): (number | string)[] {
   const result: (number | string)[] = [];
 
   for (let i = 0; i < klineData.length; i++) {
@@ -80,11 +83,17 @@ export const getIntervalInMs = (interval: string): number => {
  * @param interval 时间间隔
  * @returns 格式化后的时间文本
  */
-export const formatTimestamp = (timestamp: number, interval: string): string => {
+export const formatTimestamp = (
+  timestamp: number,
+  interval: string
+): string => {
   const date = new Date(timestamp);
   if (interval === '1d') {
     return `${date.getMonth() + 1}/${date.getDate()}`;
   } else {
-    return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+    return `${date.getHours().toString().padStart(2, '0')}:${date
+      .getMinutes()
+      .toString()
+      .padStart(2, '0')}`;
   }
 };
