@@ -21,16 +21,16 @@
 ssh-keygen -t rsa -b 4096 -C "your_email@example.com"
 
 # 将公钥复制到服务器
-ssh-copy-id root@121.199.170.204
+ssh-copy-id root@SERVER_HOST
 
 # 测试连接
-ssh root@121.199.170.204
+ssh root@SERVER_HOST
 ```
 
 #### 2. 服务器配置
 
 钩子脚本中的默认配置：
-- **服务器地址**: `121.199.170.204`
+- **服务器地址**: `SERVER_HOST`
 - **用户名**: `root`
 - **项目路径**: `/root/projects/stock-exchange-system`
 
@@ -74,13 +74,13 @@ chmod +x .git/hooks/post-push
 #### 2. SSH 连接问题
 ```bash
 # 测试 SSH 连接
-ssh root@121.199.170.204 "echo 'SSH connection successful'"
+ssh root@SERVER_HOST "echo 'SSH connection successful'"
 ```
 
 #### 3. 文件传输问题
 ```bash
 # 手动测试 scp 传输
-scp .env.production root@121.199.170.204:/root/projects/stock-exchange-system/
+scp .env.production root@SERVER_HOST:/root/projects/stock-exchange-system/
 ```
 
 #### 4. 禁用钩子
