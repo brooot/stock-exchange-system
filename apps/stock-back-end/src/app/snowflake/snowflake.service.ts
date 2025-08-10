@@ -45,11 +45,18 @@ export class SnowflakeService {
 
     this.lastTimestamp = timestamp;
 
+    // 使用BigInt进行位运算，确保64位精度
+    const timestampBig = BigInt(timestamp - this.epoch);
+    const machineIdBig = BigInt(this.machineId);
+    const sequenceBig = BigInt(this.sequence);
+    const timestampShiftBig = BigInt(this.timestampShift);
+    const machineIdShiftBig = BigInt(this.machineIdShift);
+
     // 组装雪花ID
     const id = 
-      ((timestamp - this.epoch) << this.timestampShift) |
-      (this.machineId << this.machineIdShift) |
-      this.sequence;
+      (timestampBig << timestampShiftBig) |
+      (machineIdBig << machineIdShiftBig) |
+      sequenceBig;
 
     // 转换为字符串返回，确保兼容现有的UUID字符串格式
     return id.toString();

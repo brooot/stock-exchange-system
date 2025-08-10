@@ -32,9 +32,9 @@ export class MarketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // 广播市场数据更新
   broadcastMarketUpdate(marketData: any) {
     this.server.emit('marketUpdate', marketData);
-    this.logger.log(
-      `市场数据更新：symbol: ${marketData.symbol}, price: ${marketData.price}`
-    );
+    // this.logger.log(
+    //   `市场数据更新：symbol: ${marketData.symbol}, price: ${marketData.price}`
+    // );
   }
 
   // 广播交易完成事件
