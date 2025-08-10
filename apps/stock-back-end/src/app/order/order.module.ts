@@ -7,6 +7,7 @@ import { PositionModule } from '../position/position.module';
 import { WebsocketModule } from '../websocket/websocket.module';
 import { KlineModule } from '../kline/kline.module';
 import { QueueModule } from '../queue/queue.module';
+import { SnowflakeService } from '../snowflake/snowflake.service';
 
 @Module({
   imports: [
@@ -20,7 +21,7 @@ import { QueueModule } from '../queue/queue.module';
       { name: 'trade-processing' }
     ),
   ],
-  providers: [OrderService],
+  providers: [OrderService, SnowflakeService],
   controllers: [OrderController],
   exports: [OrderService],
 })
