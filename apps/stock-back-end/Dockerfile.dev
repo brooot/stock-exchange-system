@@ -8,7 +8,7 @@ RUN apk add --no-cache dumb-init curl git postgresql-client
 WORKDIR /app
 
 # 分步安装工具以减少内存使用，并清理缓存
-RUN npm install -g pnpm@9.15.0 && npm cache clean --force
+RUN npm install -g pnpm@10.14.0 && npm cache clean --force
 RUN npm install -g nx@21.2.2 && npm cache clean --force
 RUN npm install -g nodemon@3.1.7 && npm cache clean --force
 
@@ -26,7 +26,7 @@ RUN echo 'shamefully-hoist=true' > .npmrc
 RUN echo 'node-linker=hoisted' >> .npmrc
 
 # 安装依赖（包括开发依赖）
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --prod --frozen-lockfile
 
 # 开发阶段
 FROM deps AS development

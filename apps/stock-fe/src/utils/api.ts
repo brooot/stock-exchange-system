@@ -2,7 +2,7 @@ import axios, { AxiosInstance, AxiosResponse, AxiosError } from 'axios';
 
 // 创建axios实例
 const api: AxiosInstance = axios.create({
-  baseURL: `http://${process.env.NEXT_PUBLIC_BACKEND_HOST}:${process.env.NEXT_PUBLIC_BACKEND_PORT}/api`,
+  baseURL: `${process.env.NEXT_PUBLIC_API_URL}/api`,
   timeout: 10000,
   withCredentials: true, // 自动发送cookie
   headers: {
@@ -19,7 +19,10 @@ api.interceptors.response.use(
     // 统一处理401未认证错误
     if (error.response?.status === 401) {
       // 只有当用户不在登录页面时才跳转到登录页
-      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/auth')) {
+      if (
+        typeof window !== 'undefined' &&
+        !window.location.pathname.startsWith('/auth')
+      ) {
         window.location.href = '/auth';
       }
     }
@@ -27,6 +30,10 @@ api.interceptors.response.use(
   }
 );
 
+console.log(
+  '===> `${process.env.NEXT_PUBLIC_API_URL}/api`: ',
+  `${process.env.NEXT_PUBLIC_API_URL}/api`
+);
 // API接口定义
 export const authAPI = {
   // 登录
@@ -48,8 +55,12 @@ export const accountAPI = {
 
 export const orderAPI = {
   // 创建订单
-  createOrder: (data: { type: string; method?: string; price: number; quantity: number }) =>
-    api.post('/orders/create-order', data),
+  createOrder: (data: {
+    type: string;
+    method?: string;
+    price: number;
+    quantity: number;
+  }) => api.post('/orders/create-order', data),
 
   // 获取我的订单
   getMyOrders: () => api.get('/orders/my'),
@@ -99,7 +110,9 @@ export const klineAPI = {
     limit?: number;
   }) => {
     const { symbol = 'AAPL', interval, limit = 100 } = params;
-    return api.get(`/kline?symbol=${symbol}&interval=${interval}&limit=${limit}`);
+    return api.get(
+      `/kline?symbol=${symbol}&interval=${interval}&limit=${limit}`
+    );
   },
 
   // 获取可用的时间间隔

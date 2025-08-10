@@ -43,7 +43,7 @@ export const useWebSocket = () => {
   useEffect(() => {
     // 连接到WebSocket服务器
     const socket = io(
-      `http://${process.env.NEXT_PUBLIC_BACKEND_HOST}:${process.env.NEXT_PUBLIC_BACKEND_PORT}/market`,
+      `${process.env.NEXT_PUBLIC_WS_URL}/market`,
       {
         withCredentials: true,
       }

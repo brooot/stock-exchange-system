@@ -75,12 +75,12 @@ fi
 # 构建前端镜像
 echo -e "${GREEN}🔨 构建前端镜像...${NC}"
 # 使用环境变量，如果未设置则使用默认值
-BACKEND_HOST=${NEXT_PUBLIC_BACKEND_HOST:-"www.brooot.top"}
-BACKEND_PORT=${NEXT_PUBLIC_BACKEND_PORT:-"3001"}
-echo -e "${YELLOW}📋 前端配置: ${BACKEND_HOST}:${BACKEND_PORT}${NC}"
+API_URL=${NEXT_PUBLIC_API_URL:-"https://www.brooot.top"}
+WS_URL=${NEXT_PUBLIC_WS_URL:-"wss://www.brooot.top"}
+echo -e "${YELLOW}📋 前端配置: API=${API_URL}, WS=${WS_URL}${NC}"
 docker build --platform linux/amd64 \
-  --build-arg NEXT_PUBLIC_BACKEND_HOST="${BACKEND_HOST}" \
-  --build-arg NEXT_PUBLIC_BACKEND_PORT="${BACKEND_PORT}" \
+  --build-arg NEXT_PUBLIC_API_URL="${API_URL}" \
+  --build-arg NEXT_PUBLIC_WS_URL="${WS_URL}" \
   -f apps/stock-fe/Dockerfile \
   -t "${FRONTEND_TAG}" .
 

@@ -14,7 +14,7 @@ RUN addgroup --system stock-back-end && \
     adduser --system -G stock-back-end stock-back-end
 
 # 安装pnpm
-RUN npm install -g pnpm@9.15.0
+RUN npm install -g pnpm@10.14.0
 
 # 复制依赖文件
 COPY package.json pnpm-lock.yaml ./

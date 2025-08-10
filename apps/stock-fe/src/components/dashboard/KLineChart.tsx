@@ -8,8 +8,38 @@ import { processKlineData, updateChartData, initializeChartData } from '../../ut
 import { DEFAULT_INTERVALS, getIntervalLabel } from '../../utils/klineUtils';
 import type { KlineData, KLineChartProps, ChartData } from '../../types/klineTypes';
 
-// 动态导入 echarts 以避免 SSR 问题
-let echarts: any = null;
+// 静态导入 ECharts 组件以支持 tree shaking
+import * as echarts from 'echarts/core';
+import {
+  ToolboxComponent,
+  TooltipComponent,
+  GridComponent,
+  LegendComponent,
+  DataZoomComponent,
+  VisualMapComponent
+} from 'echarts/components';
+import {
+  CandlestickChart,
+  LineChart,
+  BarChart
+} from 'echarts/charts';
+import { UniversalTransition } from 'echarts/features';
+import { CanvasRenderer } from 'echarts/renderers';
+
+// 注册 ECharts 组件
+echarts.use([
+  ToolboxComponent,
+  TooltipComponent,
+  GridComponent,
+  LegendComponent,
+  DataZoomComponent,
+  VisualMapComponent,
+  CandlestickChart,
+  LineChart,
+  BarChart,
+  CanvasRenderer,
+  UniversalTransition
+]);
 
 const KLineChart = React.memo(function KLineChart({
   symbol = 'AAPL',
@@ -23,72 +53,8 @@ const KLineChart = React.memo(function KLineChart({
 
   // 组件状态
   const [isChartReady, setIsChartReady] = useState(false);
-  const [echartsLoaded, setEchartsLoaded] = useState(false);
   const [currentInterval, setCurrentInterval] = useState(initialInterval);
   const [chartData, setChartData] = useState<ChartData>(initializeChartData());
-
-  // 动态加载ECharts库和组件
-  useEffect(() => {
-    const loadECharts = async () => {
-      if (typeof window === 'undefined' || echarts) {
-        if (echarts) setEchartsLoaded(true);
-        return;
-      }
-
-      try {
-        const [
-          echartsCore,
-          components,
-          charts,
-          features,
-          renderers
-        ] = await Promise.all([
-          import('echarts/core'),
-          import('echarts/components'),
-          import('echarts/charts'),
-          import('echarts/features'),
-          import('echarts/renderers')
-        ]);
-
-        echarts = echartsCore;
-
-        // 解构所需组件
-        const {
-          ToolboxComponent,
-          TooltipComponent,
-          GridComponent,
-          LegendComponent,
-          DataZoomComponent,
-          VisualMapComponent
-        } = components;
-
-        const { CandlestickChart, LineChart, BarChart } = charts;
-        const { UniversalTransition } = features;
-        const { CanvasRenderer } = renderers;
-
-        // 注册ECharts组件
-        echarts.use([
-          ToolboxComponent,
-          TooltipComponent,
-          GridComponent,
-          LegendComponent,
-          DataZoomComponent,
-          VisualMapComponent,
-          CandlestickChart,
-          LineChart,
-          BarChart,
-          CanvasRenderer,
-          UniversalTransition
-        ]);
-
-        setEchartsLoaded(true);
-      } catch (error) {
-        console.error('Failed to load ECharts:', error);
-      }
-    };
-
-    loadECharts();
-  }, []);
 
   // 使用 TanStack Query 获取K线数据
   const {
@@ -158,7 +124,7 @@ const KLineChart = React.memo(function KLineChart({
 
   // 初始化ECharts图表实例
   useEffect(() => {
-    if (!chartRef.current || !echarts || !echartsLoaded) return;
+    if (!chartRef.current) return;
 
     // 清理现有图表实例
     if (chartInstance.current) {
@@ -201,7 +167,7 @@ const KLineChart = React.memo(function KLineChart({
 
       setIsChartReady(false);
     };
-  }, [echartsLoaded]);
+  }, []);
 
   // 生成ECharts配置选项
   const chartOption = useMemo(() => {
@@ -296,12 +262,10 @@ const KLineChart = React.memo(function KLineChart({
       </div>
 
       {/* 图表加载状态 */}
-      {(isLoading || !echartsLoaded) && (
+      {isLoading && (
         <div className="flex items-center justify-center h-96">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-          <span className="ml-2 text-gray-600">
-            {!echartsLoaded ? '初始化图表...' : '加载中...'}
-          </span>
+          <span className="ml-2 text-gray-600">加载中...</span>
         </div>
       )}
 
@@ -309,7 +273,7 @@ const KLineChart = React.memo(function KLineChart({
       <div
         key="KLineChart"
         ref={chartRef}
-        className={`w-full h-96 ${(isLoading || !echartsLoaded) ? 'hidden' : ''}`}
+        className={`w-full h-96 ${isLoading ? 'hidden' : ''}`}
         style={{ minHeight: '400px' }}
       />
 
@@ -328,7 +292,7 @@ const KLineChart = React.memo(function KLineChart({
       )}
 
       {/* 无数据状态提示 */}
-      {!isLoading && echartsLoaded && chartData.timestamps.length === 0 && (
+      {!isLoading && chartData.timestamps.length === 0 && (
         <div className="flex items-center justify-center h-96 text-gray-500">
           <div className="text-center">
             <div className="text-4xl mb-2">📈</div>

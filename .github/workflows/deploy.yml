@@ -53,8 +53,8 @@ jobs:
 
         # 构建前端镜像（添加环境变量）
         docker build --platform linux/amd64 \
-          --build-arg NEXT_PUBLIC_BACKEND_HOST=${{ secrets.NEXT_PUBLIC_BACKEND_HOST || 'www.brooot.top' }} \
-          --build-arg NEXT_PUBLIC_BACKEND_PORT=${{ secrets.NEXT_PUBLIC_BACKEND_PORT || '3001' }} \
+          --build-arg NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL || 'https://www.brooot.top' }} \
+          --build-arg NEXT_PUBLIC_WS_URL=${{ secrets.NEXT_PUBLIC_WS_URL || 'wss://www.brooot.top' }} \
           -f apps/stock-fe/Dockerfile \
           -t ${{ secrets.DOCKER_REGISTRY }}/${{ secrets.DOCKER_NAMESPACE }}/${{ secrets.DOCKER_REPO_NAME }}:frontend-latest .
 

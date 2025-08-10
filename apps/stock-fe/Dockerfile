@@ -30,10 +30,10 @@ COPY apps/stock-fe/next-env.d.ts apps/stock-fe/
 COPY apps/stock-fe/index.d.ts apps/stock-fe/
 
 # 设置构建时环境变量
-ARG NEXT_PUBLIC_BACKEND_HOST
-ARG NEXT_PUBLIC_BACKEND_PORT
-ENV NEXT_PUBLIC_BACKEND_HOST=$NEXT_PUBLIC_BACKEND_HOST
-ENV NEXT_PUBLIC_BACKEND_PORT=$NEXT_PUBLIC_BACKEND_PORT
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_WS_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL
 
 # 构建应用
 RUN pnpm nx build stock-fe
@@ -58,6 +58,10 @@ RUN pnpm install --prod --frozen-lockfile --prefer-offline && \
     pnpm store prune && \
     rm -rf ~/.pnpm-store
 
+# 创建证书目录并复制SSL证书文件
+RUN mkdir -p /app/certificates
+COPY --chown=nextjs:nodejs certs/ /app/certificates/
+
 # 复制构建产物
 COPY --from=builder --chown=nextjs:nodejs /app/dist/apps/stock-fe/.next ./.next
 COPY --from=builder /app/dist/apps/stock-fe/public ./public
@@ -73,4 +77,4 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # 启动应用
-CMD ["pnpm", "next", "start"]
+CMD ["pnpm", "next", "start", "--experimental-https", "--experimental-https-key", "/app/certificates/www.brooot.top.key", "--experimental-https-cert", "/app/certificates/www.brooot.top.pem"]

@@ -36,7 +36,10 @@ echo "🎯 启动应用程序..."
 # 切换到后端应用目录并启动
 cd /app/apps/stock-back-end
 
-# 使用 dumb-init 和 nodemon 启动应用
+# 设置开发环境变量
+export NODE_ENV=development
+
+# 使用 dumb-init 和 nodemon 启动应用（开发模式）
 exec dumb-init nodemon \
      --watch src \
      --watch ../../prisma \
@@ -46,3 +49,4 @@ exec dumb-init nodemon \
      --ignore "**/.nx" \
      --delay "8000ms" \
      --exec "cd /app && nx build stock-back-end && node dist/apps/stock-back-end/main.js"
+    #  --exec "cd /app && nx build stock-back-end --configuration=development && node dist/apps/stock-back-end/main.js"

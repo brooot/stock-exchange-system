@@ -150,12 +150,9 @@ export const useKlineData = (params: UseKlineDataParams = {}) => {
 
   // 初始化WebSocket连接
   useEffect(() => {
-    const socket = io(
-      `http://${process.env.NEXT_PUBLIC_BACKEND_HOST}:${process.env.NEXT_PUBLIC_BACKEND_PORT}/market`,
-      {
-        withCredentials: true,
-      }
-    );
+    const socket = io(`${process.env.NEXT_PUBLIC_API_URL}/market`, {
+      withCredentials: true,
+    });
 
     socketRef.current = socket;
 
