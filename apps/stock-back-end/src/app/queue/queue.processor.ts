@@ -47,6 +47,9 @@ export class OrderProcessor {
 @Injectable()
 export class TradeProcessor {
   private readonly logger = new Logger(TradeProcessor.name);
+  
+  // 防止重复处理的缓存
+  private processedBatches = new Set<string>();
 
   constructor(
     private marketGateway: MarketGateway,
@@ -58,6 +61,25 @@ export class TradeProcessor {
     const { trades, symbol, totalVolume, timestamp } = job.data;
 
     try {
+      // 生成批次唯一标识符，避免重复处理
+      const batchId = `${symbol}_${timestamp}_${trades.length}_${totalVolume}`;
+      
+      if (this.processedBatches.has(batchId)) {
+        // this.logger.debug(`Batch ${batchId} already processed, skipping`);
+        return;
+      }
+      
+      // 标记为已处理
+      this.processedBatches.add(batchId);
+      
+      // 清理过期的批次记录（保留最近1小时）
+      if (this.processedBatches.size > 1000) {
+        const batchArray = Array.from(this.processedBatches);
+        const toKeep = batchArray.slice(-500); // 保留最新的500个
+        this.processedBatches.clear();
+        toKeep.forEach(id => this.processedBatches.add(id));
+      }
+
       // this.logger.debug(
       //   `Processing batch trade for ${symbol} with ${trades.length} trades`
       // );
@@ -68,6 +90,16 @@ export class TradeProcessor {
         0
       );
       const avgPrice = totalValue / totalVolume;
+      const lastTrade = trades[trades.length - 1];
+
+      // 统一处理：先更新K线数据，再广播事件
+      await this.klineService.handlePriceUpdate({
+        symbol,
+        price: lastTrade.price,
+        volume: totalVolume,
+        timestamp: new Date(timestamp),
+        tradeId: lastTrade.id,
+      });
 
       // 广播批量交易完成事件（只广播一次汇总信息）
       this.marketGateway.broadcastTradeCompleted({
@@ -77,16 +109,6 @@ export class TradeProcessor {
         timestamp: new Date(timestamp),
         tradeId: trades[0].id, // 使用第一个交易的ID作为代表
         batchSize: trades.length,
-      });
-
-      // 触发K线数据更新（使用最后一个交易的价格）
-      const lastTrade = trades[trades.length - 1];
-      await this.klineService.handlePriceUpdate({
-        symbol,
-        price: lastTrade.price,
-        volume: totalVolume,
-        timestamp: new Date(timestamp),
-        tradeId: lastTrade.id,
       });
 
       // 广播价格更新事件（使用最后一个交易的价格）
@@ -110,6 +132,9 @@ export class TradeProcessor {
 @Injectable()
 export class MarketDataProcessor {
   private readonly logger = new Logger(MarketDataProcessor.name);
+  
+  // 防止重复处理的缓存
+  private processedUpdates = new Map<string, number>();
 
   constructor(
     private marketGateway: MarketGateway,
@@ -123,6 +148,28 @@ export class MarketDataProcessor {
     const { symbol, updateType, data } = job.data;
 
     try {
+      // 生成更新唯一标识符，避免重复处理
+      const updateKey = `${symbol}_${updateType}`;
+      const currentTime = Date.now();
+      
+      // 检查是否在短时间内已经处理过相同的更新
+      const lastProcessed = this.processedUpdates.get(updateKey);
+      if (lastProcessed && (currentTime - lastProcessed) < 50) { // 50ms 内的重复更新忽略
+        // this.logger.debug(`Market data update ${updateKey} already processed recently, skipping`);
+        return;
+      }
+      
+      // 记录处理时间
+      this.processedUpdates.set(updateKey, currentTime);
+      
+      // 清理过期的记录（保留最近5分钟）
+      const fiveMinutesAgo = currentTime - 5 * 60 * 1000;
+      for (const [key, timestamp] of this.processedUpdates.entries()) {
+        if (timestamp < fiveMinutesAgo) {
+          this.processedUpdates.delete(key);
+        }
+      }
+
       // this.logger.debug(`Updating market data for ${symbol}: ${updateType}`);
 
       switch (updateType) {

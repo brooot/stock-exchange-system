@@ -35,6 +35,12 @@ export class KlineService implements OnModuleDestroy {
   // 内存中的K线数据缓存，按时间周期分组
   private klineCache = new Map<string, KlineData[]>();
 
+  // 已处理的K线数据跟踪器，避免重复处理
+  private processedKlineData = new Map<string, Set<number>>();
+
+  // 防抖定时器，用于减少重复广播
+  private broadcastTimers = new Map<string, NodeJS.Timeout>();
+
   // 支持的时间周期配置
   private readonly intervals: Record<string, IntervalConfig> = {
     '1m': { ms: 60 * 1000, baseMultiplier: 1 },
@@ -322,9 +328,34 @@ export class KlineService implements OnModuleDestroy {
    */
   private async saveBaseKline(symbol: string, minuteData: any) {
     try {
+      const timestamp = minuteData.timestamp;
+      const processedKey = `${symbol}_1m`;
+      
+      // 检查是否已经处理过这个时间戳的数据
+      if (!this.processedKlineData.has(processedKey)) {
+        this.processedKlineData.set(processedKey, new Set());
+      }
+      
+      const processedTimestamps = this.processedKlineData.get(processedKey)!;
+      if (processedTimestamps.has(timestamp)) {
+        // 已经处理过，跳过
+        return;
+      }
+      
+      // 标记为已处理
+      processedTimestamps.add(timestamp);
+      
+      // 清理过期的时间戳记录（保留最近24小时）
+      const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+      for (const ts of processedTimestamps) {
+        if (ts < oneDayAgo) {
+          processedTimestamps.delete(ts);
+        }
+      }
+
       const klineData = {
         symbol,
-        timestamp: new Date(minuteData.timestamp),
+        timestamp: new Date(timestamp),
         open: new Decimal(minuteData.open),
         high: new Decimal(minuteData.high),
         low: new Decimal(minuteData.low),
@@ -343,13 +374,13 @@ export class KlineService implements OnModuleDestroy {
         update: klineData,
         create: klineData,
       });
+      
       console.log(
-        `保存1分钟K线: ${symbol} ${new Date(
-          minuteData.timestamp
-        ).toISOString()}`
+        `保存1分钟K线: ${symbol} ${new Date(timestamp).toISOString()}`
       );
+      
       // 触发高级周期聚合
-      await this.aggregateHigherIntervals(symbol, minuteData.timestamp);
+      await this.aggregateHigherIntervals(symbol, timestamp);
     } catch (error) {
       console.error('保存基础K线失败:', error);
     }
@@ -467,7 +498,7 @@ export class KlineService implements OnModuleDestroy {
   }
 
   /**
-   * 更新缓存并广播
+   * 更新缓存并广播（带防抖机制）
    */
   private updateCacheAndBroadcast(
     symbol: string,
@@ -506,12 +537,37 @@ export class KlineService implements OnModuleDestroy {
 
     this.klineCache.set(cacheKey, cachedData);
 
-    // 广播更新
-    this.marketGateway.server.emit('klineUpdate', {
-      interval,
-      data: formattedKline,
-      isNewKline: existingIndex < 0,
-    });
+    // 使用防抖机制减少重复广播
+    this.debouncedBroadcast(symbol, interval, formattedKline, existingIndex < 0);
+  }
+
+  /**
+   * 防抖广播机制
+   */
+  private debouncedBroadcast(
+    symbol: string,
+    interval: string,
+    klineData: KlineData,
+    isNewKline: boolean
+  ) {
+    const broadcastKey = `${symbol}_${interval}`;
+    
+    // 清除之前的定时器
+    if (this.broadcastTimers.has(broadcastKey)) {
+      clearTimeout(this.broadcastTimers.get(broadcastKey)!);
+    }
+    
+    // 设置新的防抖定时器
+    const timer = setTimeout(() => {
+      this.marketGateway.server.emit('klineUpdate', {
+        interval,
+        data: klineData,
+        isNewKline,
+      });
+      this.broadcastTimers.delete(broadcastKey);
+    }, 100); // 100ms 防抖延迟
+    
+    this.broadcastTimers.set(broadcastKey, timer);
   }
 
   /**
@@ -727,11 +783,26 @@ export class KlineService implements OnModuleDestroy {
 
   onModuleDestroy() {
     console.log('KlineService 销毁，清理定时器...');
+    
+    // 清理定期任务定时器
     if (this.periodicTaskTimer) {
       clearInterval(this.periodicTaskTimer);
     }
+    
+    // 清理数据清理定时器
     if (this.cleanupTimer) {
       clearInterval(this.cleanupTimer);
     }
+    
+    // 清理所有防抖广播定时器
+    for (const timer of this.broadcastTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.broadcastTimers.clear();
+    
+    // 清理缓存数据
+    this.processedKlineData.clear();
+    
+    console.log('KlineService 清理完成。');
   }
 }
