@@ -30,10 +30,6 @@ api.interceptors.response.use(
   }
 );
 
-console.log(
-  '===> `${process.env.NEXT_PUBLIC_API_URL}/api`: ',
-  `${process.env.NEXT_PUBLIC_API_URL}/api`
-);
 // API接口定义
 export const authAPI = {
   // 登录

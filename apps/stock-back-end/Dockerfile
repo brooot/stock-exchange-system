@@ -22,6 +22,11 @@ COPY package.json pnpm-lock.yaml ./
 # 安装生产依赖（优化安装过程）
 RUN pnpm install --prod --frozen-lockfile
 
+# 重新构建原生模块以确保架构兼容性
+# 特别针对bcrypt等原生模块进行重建
+RUN pnpm rebuild bcrypt
+RUN pnpm rebuild
+
 # 直接复制Nx构建好的产物（由project.json中的build任务生成）
 COPY dist/apps/stock-back-end/ ./
 # 复制 Prisma schema
