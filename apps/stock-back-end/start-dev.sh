@@ -39,14 +39,5 @@ cd /app/apps/stock-back-end
 # 设置开发环境变量
 export NODE_ENV=development
 
-# 使用 dumb-init 和 nodemon 启动应用（开发模式）
-exec dumb-init nodemon \
-     --watch src \
-     --watch ../../prisma \
-     --ignore "**/*.test.ts" \
-     --ignore "**/*.spec.ts" \
-     --ignore "**/node_modules" \
-     --ignore "**/.nx" \
-     --delay "8000ms" \
-     --exec "cd /app && nx build stock-back-end && node dist/apps/stock-back-end/main.js"
-    #  --exec "cd /app && nx build stock-back-end --configuration=development && node dist/apps/stock-back-end/main.js"
+# 使用 nodemon 启动应用（开发模式，配置在 nodemon.json 中）
+exec nodemon

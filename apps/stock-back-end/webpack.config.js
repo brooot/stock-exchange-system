@@ -153,7 +153,8 @@ module.exports = {
       message: /Critical dependency: the request of a dependency is an expression/,
     },
   ],
-  watch: process.env.NODE_ENV !== 'production',
+  // 在 nodemon 环境下禁用 webpack watch，让 nodemon 处理文件监听
+  watch: false,
   watchOptions: {
     ignored: /node_modules/,
     poll: 1000,

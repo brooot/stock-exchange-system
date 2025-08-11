@@ -20,6 +20,7 @@ export function getCorsOrigins(): string[] {
   ];
 
   const devOrigins = [
+    // 本地开发地址
     'http://localhost:3000', // 开发环境前端地址
     'https://localhost:3000', // HTTPS开发环境前端地址
     'https://localhost:443', // HTTPS开发环境后端地址 (标准端口)
@@ -32,9 +33,13 @@ export function getCorsOrigins(): string[] {
     'https://127.0.0.1', // HTTPS本地回环地址 (默认端口)
     'http://127.0.0.1:3001', // 本地回环地址
     'https://127.0.0.1:3001', // HTTPS本地回环地址
-    'https://www.brooot.top:3000', // 开发环境使用正式域名的前端地址
+    // 开发环境使用正式域名的地址
+    'https://www.brooot.top:3000', // 开发环境前端地址 (正式域名)
+    'http://www.brooot.top:3000', // 开发环境前端地址 (正式域名，HTTP备用)
+    'https://www.brooot.top:3001', // 开发环境后端地址 (正式域名)
+    'http://www.brooot.top:3001', // 开发环境后端地址 (正式域名，HTTP备用)
   ];
 
-  // return isProduction ? prodOrigins : devOrigins;
-  return devOrigins.concat(prodOrigins);
+  // 根据环境返回相应的源地址
+  return isProduction ? prodOrigins : devOrigins;
 }

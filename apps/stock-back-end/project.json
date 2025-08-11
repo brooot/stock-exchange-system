@@ -11,18 +11,28 @@
         "command": "webpack-cli build",
         "args": [
           "--node-env=production"
-        ]
+        ],
+        "env": {
+          "NODE_ENV": "production"
+        }
       },
       "configurations": {
         "development": {
-          "args": ["--node-env=development"]
+          "args": [
+            "--node-env=development"
+          ],
+          "env": {
+            "NODE_ENV": "development"
+          }
         }
       }
     },
     "serve": {
       "executor": "@nx/js:node",
       "defaultConfiguration": "development",
-      "dependsOn": ["build"],
+      "dependsOn": [
+        "build"
+      ],
       "options": {
         "buildTarget": "stock-back-end:build",
         "runBuildTargetDependencies": false
