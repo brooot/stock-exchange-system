@@ -76,5 +76,5 @@ EXPOSE 3000
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# 启动应用
-CMD ["pnpm", "next", "start", "--experimental-https", "--experimental-https-key", "/app/certificates/www.brooot.top.key", "--experimental-https-cert", "/app/certificates/www.brooot.top.pem"]
+# 启动应用 - 支持HTTPS
+CMD ["pnpm", "next", "start"]
