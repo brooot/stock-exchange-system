@@ -6,10 +6,7 @@
 
 ```bash
 # 快速启动
-./scripts/dev-start.sh
-
-# 清理缓存后启动（首次运行或遇到问题时）
-./scripts/dev-start.sh --clean
+./dev.sh
 ```
 
 ## 📈 性能优化说明
