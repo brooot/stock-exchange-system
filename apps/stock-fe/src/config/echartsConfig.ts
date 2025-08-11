@@ -191,10 +191,18 @@ export const generateChartOption = (chartData: ChartData, currentInterval: strin
 /**
  * 生成DataZoom配置选项
  * @param dataLength 数据长度
+ * @param chartWidth 图表容器宽度（可选）
  * @returns DataZoom配置对象
  */
-export const generateDataZoomOption = (dataLength: number) => {
-  const start = dataLength <= 50 ? 0 : Math.max(0, 100 - (100 / dataLength) * 50);
+export const generateDataZoomOption = (dataLength: number, chartWidth?: number) => {
+  // 计算最小显示的K线柱子数量
+  // 每个K线柱子最小宽度约为8像素，加上间距约12像素
+  const minCandleWidth = 12;
+  const minVisibleCount = chartWidth ? Math.max(10, Math.floor(chartWidth * 0.8 / minCandleWidth)) : 50;
+  
+  // 计算显示范围，确保不少于最小数量
+  const visibleCount = Math.min(dataLength, minVisibleCount);
+  const start = dataLength <= visibleCount ? 0 : Math.max(0, 100 - (100 / dataLength) * visibleCount);
   
   return {
     dataZoom: [
@@ -202,7 +210,8 @@ export const generateDataZoomOption = (dataLength: number) => {
         type: 'inside',
         xAxisIndex: [0, 1],
         start,
-        end: 100
+        end: 100,
+        minSpan: Math.max(1, (visibleCount / dataLength) * 100) // 设置最小缩放范围
       },
       {
         show: true,
@@ -210,7 +219,8 @@ export const generateDataZoomOption = (dataLength: number) => {
         type: 'slider',
         top: '85%',
         start,
-        end: 100
+        end: 100,
+        minSpan: Math.max(1, (visibleCount / dataLength) * 100) // 设置最小缩放范围
       }
     ]
   };

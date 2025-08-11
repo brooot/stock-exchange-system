@@ -34,7 +34,7 @@ ssh root@SERVER_HOST
 - **用户名**: `root`
 - **项目路径**: `/root/projects/stock-exchange-system`
 
-如需修改，请编辑 `.git/hooks/post-push` 文件。
+如需修改，请编辑 `.git/hooks/pre-push` 文件。
 
 ### 使用方法
 
@@ -68,7 +68,7 @@ ssh root@SERVER_HOST
 #### 1. 权限问题
 ```bash
 # 确保钩子脚本有执行权限
-chmod +x .git/hooks/post-push
+chmod +x .git/hooks/pre-push
 ```
 
 #### 2. SSH 连接问题
@@ -87,7 +87,7 @@ scp .env.production root@SERVER_HOST:/root/projects/stock-exchange-system/
 如果需要临时禁用钩子：
 ```bash
 # 重命名钩子文件
-mv .git/hooks/post-push .git/hooks/post-push.disabled
+mv .git/hooks/pre-push .git/hooks/pre-push.disabled
 ```
 
 ### 安全注意事项
@@ -98,11 +98,11 @@ mv .git/hooks/post-push .git/hooks/post-push.disabled
 
 ### 自定义配置
 
-如需修改服务器配置或添加其他功能，请编辑 `.git/hooks/post-push` 文件：
+如需修改服务器配置或添加其他功能，请编辑 `.git/hooks/pre-push` 文件：
 
 ```bash
 # 编辑钩子脚本
-vim .git/hooks/post-push
+vim .git/hooks/pre-push
 ```
 
 常见自定义选项：

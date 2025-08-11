@@ -55,6 +55,7 @@ const KLineChart = React.memo(function KLineChart({
   const [isChartReady, setIsChartReady] = useState(false);
   const [currentInterval, setCurrentInterval] = useState(initialInterval);
   const [chartData, setChartData] = useState<ChartData>(initializeChartData());
+  const [chartWidth, setChartWidth] = useState<number>(0);
 
   // 使用 TanStack Query 获取K线数据
   const {
@@ -137,6 +138,10 @@ const KLineChart = React.memo(function KLineChart({
       if (chartRef.current && echarts) {
         chartInstance.current = echarts.init(chartRef.current);
 
+        // 获取图表容器宽度
+        const containerWidth = chartRef.current.clientWidth;
+        setChartWidth(containerWidth);
+
         // 确保图表正确计算容器尺寸
         setTimeout(() => {
           chartInstance.current?.resize();
@@ -147,14 +152,38 @@ const KLineChart = React.memo(function KLineChart({
 
     // 监听窗口大小变化事件
     const handleWindowResize = () => {
-      chartInstance.current?.resize();
+      if (chartInstance.current && chartRef.current) {
+        chartInstance.current.resize();
+        // 更新图表容器宽度
+        const containerWidth = chartRef.current.clientWidth;
+        setChartWidth(containerWidth);
+      }
     };
     window.addEventListener('resize', handleWindowResize);
+
+    // 使用ResizeObserver监听容器大小变化
+    let resizeObserver: ResizeObserver | null = null;
+    if (chartRef.current && window.ResizeObserver) {
+      resizeObserver = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const { width } = entry.contentRect;
+          setChartWidth(width);
+          if (chartInstance.current) {
+            chartInstance.current.resize();
+          }
+        }
+      });
+      resizeObserver.observe(chartRef.current);
+    }
 
     // 清理函数
     return () => {
       clearTimeout(initTimer);
       window.removeEventListener('resize', handleWindowResize);
+
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
 
       if (updateTimeoutRef.current) {
         clearTimeout(updateTimeoutRef.current);
@@ -182,8 +211,8 @@ const KLineChart = React.memo(function KLineChart({
     if (!chartData || chartData.timestamps.length === 0) {
       return null;
     }
-    return generateDataZoomOption(chartData.timestamps.length);
-  }, [chartData]);
+    return generateDataZoomOption(chartData.timestamps.length, chartWidth);
+  }, [chartData, chartWidth]);
 
   // 初始化图表的dataZoom配置（只在图表首次准备好时设置）
   const isDataZoomInitialized = useRef(false);
