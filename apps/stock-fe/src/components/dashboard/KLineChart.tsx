@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { useKlineData, useAvailableIntervals } from '../../hooks/useKlineQuery';
 import { useKlineWebSocket } from '../../hooks/useKlineWebSocket';
 import { generateChartOption, generateDataZoomOption } from '../../config/echartsConfig';
-import { processKlineData, updateChartData, initializeChartData } from '../../utils/chartDataProcessor';
+import { processKlineData, updateChartData, initializeChartData, getLatestPriceInfo } from '../../utils/chartDataProcessor';
 import { DEFAULT_INTERVALS, getIntervalLabel } from '../../utils/klineUtils';
 import type { KlineData, KLineChartProps, ChartData } from '../../types/klineTypes';
 
@@ -75,12 +75,22 @@ const KLineChart = React.memo(function KLineChart({
     isLoading: intervalsLoading
   } = useAvailableIntervals();
 
+  // 使用ref保存最新的currentInterval值，避免闭包问题
+  const currentIntervalRef = useRef(currentInterval);
+
+  // 更新ref值
+  useEffect(() => {
+    currentIntervalRef.current = currentInterval;
+  }, [currentInterval]);
+
   // K线数据更新处理函数
   const handleKlineUpdate = useCallback((data: KlineData, interval: string) => {
-    if (interval === currentInterval) {
+    // 使用ref获取最新的currentInterval值
+    const latestCurrentInterval = currentIntervalRef.current;
+    if (interval === latestCurrentInterval) {
       setChartData(prevData => updateChartData(prevData, data));
     }
-  }, [currentInterval]);
+  }, []);
 
   // 使用WebSocket Hook
   const { isConnected } = useKlineWebSocket({
@@ -118,7 +128,6 @@ const KLineChart = React.memo(function KLineChart({
   const changeInterval = useCallback((newInterval: string) => {
     setCurrentInterval(newInterval);
     onIntervalChange?.(newInterval);
-
     // TanStack Query 会自动处理数据获取
     // 如果需要强制刷新，可以调用 refreshKlineData
   }, [onIntervalChange]);
@@ -203,8 +212,12 @@ const KLineChart = React.memo(function KLineChart({
     if (!chartData || chartData.timestamps.length === 0) {
       return null;
     }
-    return generateChartOption(chartData, currentInterval);
-  }, [chartData, currentInterval]);
+
+    // 获取当前价格（最新K线的收盘价）
+    const latestPriceInfo = getLatestPriceInfo(chartData);
+    const currentPrice = latestPriceInfo?.close;
+    return generateChartOption(chartData, currentInterval, currentPrice, symbol);
+  }, [chartData, currentInterval, symbol]);
 
   // 生成DataZoom配置选项
   const dataZoomOption = useMemo(() => {
@@ -268,7 +281,7 @@ const KLineChart = React.memo(function KLineChart({
     <div className="bg-white rounded-lg shadow p-6">
       {/* 图表标题和时间周期选择器 */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-medium text-gray-900">K线图</h2>
+        <h2 className="text-lg font-medium text-gray-900">价格K线图</h2>
 
         <div className="flex space-x-2">
           {intervalsLoading ? (

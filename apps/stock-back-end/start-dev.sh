@@ -40,4 +40,4 @@ cd /app/apps/stock-back-end
 export NODE_ENV=development
 
 # 使用 nodemon 启动应用（开发模式，配置在 nodemon.json 中）
-exec nodemon
+exec dumb-init nodemon

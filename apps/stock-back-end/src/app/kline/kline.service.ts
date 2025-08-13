@@ -822,7 +822,7 @@ export class KlineService implements OnModuleDestroy {
       console.log(`找到 ${symbols.length} 个股票代码需要检查:`, symbols);
       const now = Date.now();
       const currentMinute = Math.floor(now / (60 * 1000)) * (60 * 1000);
-      
+
       for (const symbol of symbols) {
         await this.fillMissingKlineForSymbol(symbol, currentMinute);
       }
@@ -835,7 +835,10 @@ export class KlineService implements OnModuleDestroy {
   /**
    * 为指定股票补全缺失的K线数据
    */
-  private async fillMissingKlineForSymbol(symbol: string, currentMinute: number) {
+  private async fillMissingKlineForSymbol(
+    symbol: string,
+    currentMinute: number
+  ) {
     try {
       // 获取最后一条K线数据
       const lastKline = await this.prisma.klineBase.findFirst({
@@ -850,11 +853,11 @@ export class KlineService implements OnModuleDestroy {
 
       const lastTimestamp = lastKline.timestamp.getTime();
       const nextExpectedTimestamp = lastTimestamp + 60 * 1000; // 下一分钟
-      
+
       // 检查是否有缺失的分钟数据（最多补全最近1小时的数据）
       const oneHourAgo = currentMinute - 60 * 60 * 1000;
       const startFillTime = Math.max(nextExpectedTimestamp, oneHourAgo);
-      
+
       if (startFillTime >= currentMinute) {
         // 没有需要补全的数据
         return;
@@ -862,9 +865,14 @@ export class KlineService implements OnModuleDestroy {
 
       // 检查哪些分钟缺失数据
       const missingTimestamps: number[] = [];
-      for (let timestamp = startFillTime; timestamp < currentMinute; timestamp += 60 * 1000) {
-        const alignedTimestamp = Math.floor(timestamp / (60 * 1000)) * (60 * 1000);
-        
+      for (
+        let timestamp = startFillTime;
+        timestamp < currentMinute;
+        timestamp += 60 * 1000
+      ) {
+        const alignedTimestamp =
+          Math.floor(timestamp / (60 * 1000)) * (60 * 1000);
+
         // 检查数据库中是否已存在该时间戳的数据
         const existing = await this.prisma.klineBase.findUnique({
           where: {
@@ -874,7 +882,7 @@ export class KlineService implements OnModuleDestroy {
             },
           },
         });
-        
+
         if (!existing) {
           missingTimestamps.push(alignedTimestamp);
         }
@@ -884,11 +892,13 @@ export class KlineService implements OnModuleDestroy {
         return;
       }
 
-      console.log(`发现 ${symbol} 缺失 ${missingTimestamps.length} 分钟的K线数据，开始补全...`);
+      console.log(
+        `发现 ${symbol} 缺失 ${missingTimestamps.length} 分钟的K线数据，开始补全...`
+      );
 
       // 用最后已知价格补全缺失的数据
       const lastPrice = lastKline.close.toNumber();
-      
+
       for (const timestamp of missingTimestamps) {
         const klineData = {
           symbol,
@@ -904,11 +914,11 @@ export class KlineService implements OnModuleDestroy {
           await this.prisma.klineBase.create({
             data: klineData,
           });
-          
+
           // 更新缓存
           const cacheKey = `${symbol}_1m`;
           const cachedData = this.klineCache.get(cacheKey) || [];
-          
+
           const newKlineData = {
             timestamp,
             open: lastPrice,
@@ -919,17 +929,17 @@ export class KlineService implements OnModuleDestroy {
             symbol,
             interval: '1m',
           };
-          
+
           cachedData.push(newKlineData);
           cachedData.sort((a, b) => a.timestamp - b.timestamp);
-          
+
           // 保持缓存大小
           if (cachedData.length > 1000) {
             cachedData.splice(0, cachedData.length - 1000);
           }
-          
+
           this.klineCache.set(cacheKey, cachedData);
-          
+
           // 广播更新
           this.marketGateway.server.emit('klineUpdate', {
             interval: '1m',
@@ -937,22 +947,25 @@ export class KlineService implements OnModuleDestroy {
             isNewKline: true,
             isFilled: true, // 标记为补全数据
           });
-          
         } catch (error) {
           // 如果插入失败（可能是并发插入），忽略错误
           if (!error.message?.includes('duplicate key')) {
-            console.error(`补全K线数据失败: ${symbol} ${new Date(timestamp).toISOString()}`, error);
+            console.error(
+              `补全K线数据失败: ${symbol} ${new Date(timestamp).toISOString()}`,
+              error
+            );
           }
         }
       }
-      
-      console.log(`完成补全 ${symbol} 的 ${missingTimestamps.length} 分钟K线数据`);
-      
+
+      console.log(
+        `完成补全 ${symbol} 的 ${missingTimestamps.length} 分钟K线数据`
+      );
+
       // 触发高级周期的聚合更新
       for (const timestamp of missingTimestamps) {
         await this.aggregateHigherIntervals(symbol, timestamp);
       }
-      
     } catch (error) {
       console.error(`补全 ${symbol} K线数据失败:`, error);
     }
