@@ -16,7 +16,8 @@ import {
   GridComponent,
   LegendComponent,
   DataZoomComponent,
-  VisualMapComponent
+  MarkLineComponent,
+  MarkPointComponent
 } from 'echarts/components';
 import {
   CandlestickChart,
@@ -33,12 +34,13 @@ echarts.use([
   GridComponent,
   LegendComponent,
   DataZoomComponent,
-  VisualMapComponent,
   CandlestickChart,
   LineChart,
   BarChart,
   CanvasRenderer,
-  UniversalTransition
+  UniversalTransition,
+  MarkLineComponent,
+  MarkPointComponent
 ]);
 
 const KLineChart = React.memo(function KLineChart({
@@ -55,7 +57,7 @@ const KLineChart = React.memo(function KLineChart({
   const [isChartReady, setIsChartReady] = useState(false);
   const [currentInterval, setCurrentInterval] = useState(initialInterval);
   const [chartData, setChartData] = useState<ChartData>(initializeChartData());
-  const [chartWidth, setChartWidth] = useState<number>(0);
+
 
   // 使用 TanStack Query 获取K线数据
   const {
@@ -65,7 +67,7 @@ const KLineChart = React.memo(function KLineChart({
   } = useKlineData({
     symbol,
     interval: currentInterval,
-    limit: 100,
+    limit: 1000,
     enabled: true
   });
 
@@ -147,9 +149,7 @@ const KLineChart = React.memo(function KLineChart({
       if (chartRef.current && echarts) {
         chartInstance.current = echarts.init(chartRef.current);
 
-        // 获取图表容器宽度
-        const containerWidth = chartRef.current.clientWidth;
-        setChartWidth(containerWidth);
+
 
         // 确保图表正确计算容器尺寸
         setTimeout(() => {
@@ -161,38 +161,14 @@ const KLineChart = React.memo(function KLineChart({
 
     // 监听窗口大小变化事件
     const handleWindowResize = () => {
-      if (chartInstance.current && chartRef.current) {
-        chartInstance.current.resize();
-        // 更新图表容器宽度
-        const containerWidth = chartRef.current.clientWidth;
-        setChartWidth(containerWidth);
-      }
+      chartInstance.current?.resize();
     };
     window.addEventListener('resize', handleWindowResize);
-
-    // 使用ResizeObserver监听容器大小变化
-    let resizeObserver: ResizeObserver | null = null;
-    if (chartRef.current && window.ResizeObserver) {
-      resizeObserver = new ResizeObserver((entries) => {
-        for (const entry of entries) {
-          const { width } = entry.contentRect;
-          setChartWidth(width);
-          if (chartInstance.current) {
-            chartInstance.current.resize();
-          }
-        }
-      });
-      resizeObserver.observe(chartRef.current);
-    }
 
     // 清理函数
     return () => {
       clearTimeout(initTimer);
       window.removeEventListener('resize', handleWindowResize);
-
-      if (resizeObserver) {
-        resizeObserver.disconnect();
-      }
 
       if (updateTimeoutRef.current) {
         clearTimeout(updateTimeoutRef.current);
@@ -207,6 +183,48 @@ const KLineChart = React.memo(function KLineChart({
     };
   }, []);
 
+  // 设置dataZoom事件监听器，确保能访问到最新的chartData
+  useEffect(() => {
+    if (!chartInstance.current || !isChartReady || !chartData || chartData.timestamps.length === 0) {
+      return;
+    }
+
+    // 移除之前的事件监听器
+    chartInstance.current.off('dataZoom');
+
+    // 添加新的事件监听器
+    chartInstance.current.on('dataZoom', (params: any) => {
+      if (chartData && chartData.timestamps.length > 0) {
+        const option = chartInstance.current?.getOption();
+        const dataZoom = option?.dataZoom?.[0];
+        if (dataZoom) {
+          const totalLength = chartData.timestamps.length;
+          const startPercent = dataZoom.start || 0;
+          const endPercent = dataZoom.end || 100;
+
+          const startIndex = Math.floor((startPercent / 100) * totalLength);
+          const endIndex = Math.floor((endPercent / 100) * totalLength);
+          const visibleCount = endIndex - startIndex;
+          const endTimestamp = chartData.timestamps[endIndex - 1];
+
+          currentDisplayState.current = {
+            endTimestamp,
+            visibleCount,
+            startIndex,
+            endIndex
+          };
+        }
+      }
+    });
+
+    // 清理函数
+    return () => {
+      if (chartInstance.current) {
+        chartInstance.current.off('dataZoom');
+      }
+    };
+  }, [chartData, isChartReady]);
+
   // 生成ECharts配置选项
   const chartOption = useMemo(() => {
     if (!chartData || chartData.timestamps.length === 0) {
@@ -219,16 +237,30 @@ const KLineChart = React.memo(function KLineChart({
     return generateChartOption(chartData, currentInterval, currentPrice, symbol);
   }, [chartData, currentInterval, symbol]);
 
+  // 保存当前显示状态，用于时间周期切换时保持一致性
+  const currentDisplayState = useRef<{
+    endTimestamp?: number;
+    visibleCount?: number;
+    startIndex?: number;
+    endIndex?: number;
+  }>({});
   // 生成DataZoom配置选项
   const dataZoomOption = useMemo(() => {
     if (!chartData || chartData.timestamps.length === 0) {
       return null;
     }
-    return generateDataZoomOption(chartData.timestamps.length, chartWidth);
-  }, [chartData, chartWidth]);
+    return generateDataZoomOption(
+      chartData.timestamps.length,
+      currentInterval,
+      currentDisplayState.current,
+      chartData.timestamps
+    );
+  }, [chartData, currentInterval]);
 
   // 初始化图表的dataZoom配置（只在图表首次准备好时设置）
   const isDataZoomInitialized = useRef(false);
+
+
 
   useEffect(() => {
     if (!chartInstance.current || !isChartReady || !dataZoomOption || isDataZoomInitialized.current) return;
@@ -245,6 +277,7 @@ const KLineChart = React.memo(function KLineChart({
   // 重置dataZoom初始化状态当时间周期改变时
   useEffect(() => {
     isDataZoomInitialized.current = false;
+    // 注意：不清空currentDisplayState，保持显示状态以实现一致性
   }, [currentInterval]);
 
   // 更新图表数据和配置（不包含dataZoom）

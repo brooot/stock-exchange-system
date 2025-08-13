@@ -19,6 +19,10 @@ export const generateChartOption = (
 ): any => {
   const { timestamps = [], klineData, volumeData, movingAverages } = chartData;
   const { ma5, ma10, ma20, ma30 } = movingAverages;
+  const xAxisData = timestamps.map((timestamp: number) =>
+    formatTimestamp(timestamp, currentInterval)
+  );
+
   return {
     animation: false,
     legend: {
@@ -77,14 +81,10 @@ export const generateChartOption = (
     xAxis: [
       {
         type: 'category',
-        data: timestamps.map((timestamp: number) =>
-          formatTimestamp(timestamp, currentInterval)
-        ),
-        boundaryGap: false,
+        data: xAxisData,
+        boundaryGap: true,
         axisLine: { onZero: false },
         splitLine: { show: false },
-        min: 'dataMin',
-        max: 'dataMax',
         axisPointer: {
           z: 100,
         },
@@ -92,16 +92,12 @@ export const generateChartOption = (
       {
         type: 'category',
         gridIndex: 1,
-        data: timestamps.map((timestamp: number) =>
-          formatTimestamp(timestamp, currentInterval)
-        ),
-        boundaryGap: false,
+        data: xAxisData,
+        boundaryGap: true,
         axisLine: { onZero: false },
         axisTick: { show: false },
         splitLine: { show: false },
         axisLabel: { show: false },
-        min: 'dataMin',
-        max: 'dataMax',
       },
     ],
     yAxis: [
@@ -148,8 +144,7 @@ export const generateChartOption = (
                 show: true,
                 position: 'end',
                 formatter: `${currentPrice.toFixed(2)}`,
-                backgroundColor: '#ff7f00',
-                color: '#fff',
+                color: '#ff7f00',
                 padding: [4, 8],
                 fontSize: 12,
                 fontWeight: 'bold',
@@ -161,6 +156,45 @@ export const generateChartOption = (
               ],
             }
           : undefined,
+        markPoint: {
+          symbol: 'rect',
+          symbolSize: [20, 2],
+          itemStyle: {
+            color: '#000',
+          },
+          label: {
+            show: true,
+            formatter: function (params: any) {
+              return params.value.toFixed(2);
+            },
+            color: '#000',
+            padding: [0, 0],
+            fontSize: 10,
+            fontWeight: 'bold',
+          },
+          data: [
+            {
+              name: 'min point on close',
+              type: 'min',
+              valueDim: 'lowest',
+              symbolOffset: [12, 0],
+              label: {
+                position: 'bottom',
+                offset: [0, 0],
+              },
+            },
+            {
+              name: 'max point on close',
+              type: 'max',
+              valueDim: 'highest',
+              symbolOffset: [12, 0],
+              label: {
+                position: 'top',
+                offset: [0, 0],
+              },
+            },
+          ],
+        },
       },
       {
         name: 'MA5',
@@ -233,35 +267,83 @@ export const generateChartOption = (
 /**
  * 生成DataZoom配置选项
  * @param dataLength 数据长度
- * @param chartWidth 图表容器宽度（可选）
+ * @param currentInterval 当前时间周期
+ * @param displayState 当前显示状态
+ * @param timestamps 时间戳数组
  * @returns DataZoom配置对象
  */
 export const generateDataZoomOption = (
   dataLength: number,
-  chartWidth?: number
+  currentInterval?: string,
+  displayState?: {
+    endTimestamp?: number;
+    visibleCount?: number;
+    startIndex?: number;
+    endIndex?: number;
+  },
+  timestamps?: number[]
 ) => {
-  // 计算最小显示的K线柱子数量
-  // 每个K线柱子最小宽度约为8像素，加上间距约12像素
-  const minCandleWidth = 12;
-  const minVisibleCount = chartWidth
-    ? Math.max(10, Math.floor((chartWidth * 0.8) / minCandleWidth))
-    : 50;
+  let visibleCount = 15; // 默认显示15个柱子
+  let start = 0;
+  let end = 100;
 
-  // 计算显示范围，确保不少于最小数量
-  const visibleCount = Math.min(dataLength, minVisibleCount);
-  const start =
-    dataLength <= visibleCount
-      ? 0
-      : Math.max(0, 100 - (100 / dataLength) * visibleCount);
+  // 如果有保存的显示状态，尝试保持一致性
+  if (
+    displayState &&
+    displayState.endTimestamp &&
+    displayState.visibleCount &&
+    timestamps &&
+    timestamps.length > 0
+  ) {
+    // 找到最接近保存的截止时间的索引
+    let endIndex = timestamps.length - 1;
+    for (let i = timestamps.length - 1; i >= 0; i--) {
+      if (timestamps[i] <= displayState.endTimestamp) {
+        endIndex = i;
+        break;
+      }
+    }
 
+    // 计算应该显示的柱子数量（不超过保存的数量）
+    const maxVisibleCount = Math.min(displayState.visibleCount, endIndex + 1);
+    visibleCount = maxVisibleCount;
+
+    // 计算开始和结束的百分比
+    const startIndex = Math.max(0, endIndex - visibleCount + 1);
+    start = (startIndex / dataLength) * 100;
+    end = ((endIndex + 1) / dataLength) * 100;
+
+    // 确保end不超过100%
+    end = Math.min(end, 100);
+
+    // 如果计算出的范围太小，调整到合理范围
+    if (end - start < 5) {
+      end = Math.min(100, start + 5);
+    }
+  } else {
+    // 首次加载或没有保存状态时，显示最后的数据
+    if (dataLength <= visibleCount) {
+      // 如果数据总量少于或等于要显示的柱子数，显示全部数据
+      start = 0;
+      end = 100;
+    } else {
+      // 如果数据总量大于要显示的柱子数，显示最后的 visibleCount 个柱子
+      const endIndex = dataLength - 1;
+      const startIndex = Math.max(0, endIndex - visibleCount + 1);
+      start = (startIndex / dataLength) * 100;
+      end = ((endIndex + 1) / dataLength) * 100;
+    }
+  }
+
+  // const minSpan = Math.max(1, (visibleCount / dataLength) * 100);
   return {
     dataZoom: [
       {
         type: 'inside',
         xAxisIndex: [0, 1],
         start,
-        end: 100,
-        minSpan: Math.max(1, (visibleCount / dataLength) * 100), // 设置最小缩放范围
+        end,
+        // minSpan, // 设置最小缩放范围
       },
       {
         show: true,
@@ -269,8 +351,8 @@ export const generateDataZoomOption = (
         type: 'slider',
         top: '85%',
         start,
-        end: 100,
-        minSpan: Math.max(1, (visibleCount / dataLength) * 100), // 设置最小缩放范围
+        end,
+        // minSpan, // 设置最小缩放范围
       },
     ],
   };
