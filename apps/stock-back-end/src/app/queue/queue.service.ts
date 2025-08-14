@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { OrderType, OrderMethod, Trade } from '@prisma/client';
@@ -26,7 +26,21 @@ export interface BatchTradeProcessingData {
 }
 
 @Injectable()
-export class QueueService {
+export class QueueService implements OnModuleInit, OnModuleDestroy {
+  private cleanupTimer: NodeJS.Timeout;
+
+  onModuleInit() {
+    // 每30分钟自动清理队列
+    this.cleanupTimer = setInterval(() => {
+      this.cleanQueues();
+    }, 10 * 60 * 1000);
+  }
+
+  onModuleDestroy() {
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+    }
+  }
   constructor(
     @InjectQueue('order-processing') private orderQueue: Queue,
     @InjectQueue('trade-processing') private tradeQueue: Queue,
@@ -45,8 +59,8 @@ export class QueueService {
         type: 'exponential',
         delay: 2000,
       },
-      removeOnComplete: 100,
-      removeOnFail: 50,
+      removeOnComplete: 5,
+      removeOnFail: 10,
     });
   }
 
@@ -65,8 +79,8 @@ export class QueueService {
         type: 'exponential',
         delay: 1000,
       },
-      removeOnComplete: 200,
-      removeOnFail: 100,
+      removeOnComplete: 5,
+      removeOnFail: 10,
     });
   }
 
@@ -90,8 +104,8 @@ export class QueueService {
           type: 'fixed',
           delay: 500,
         },
-        removeOnComplete: 50,
-        removeOnFail: 25,
+        removeOnComplete: 5,
+        removeOnFail: 10,
       }
     );
   }
@@ -132,12 +146,12 @@ export class QueueService {
   // 清理队列
   async cleanQueues(): Promise<void> {
     await Promise.all([
-      this.orderQueue.clean(24 * 60 * 60 * 1000, 'completed'),
-      this.orderQueue.clean(24 * 60 * 60 * 1000, 'failed'),
-      this.tradeQueue.clean(24 * 60 * 60 * 1000, 'completed'),
-      this.tradeQueue.clean(24 * 60 * 60 * 1000, 'failed'),
-      this.marketDataQueue.clean(6 * 60 * 60 * 1000, 'completed'),
-      this.marketDataQueue.clean(6 * 60 * 60 * 1000, 'failed'),
+      this.orderQueue.clean(1 * 60 * 60 * 1000, 'completed'),
+      this.orderQueue.clean(1 * 60 * 60 * 1000, 'failed'),
+      this.tradeQueue.clean(1 * 60 * 60 * 1000, 'completed'),
+      this.tradeQueue.clean(1 * 60 * 60 * 1000, 'failed'),
+      this.marketDataQueue.clean(30 * 60 * 1000, 'completed'),
+      this.marketDataQueue.clean(30 * 60 * 1000, 'failed'),
     ]);
   }
 

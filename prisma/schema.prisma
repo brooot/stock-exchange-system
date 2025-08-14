@@ -33,11 +33,12 @@ enum OrderStatus {
 
 // 用户表
 model User {
-  id           Int      @id @default(autoincrement())
-  username     String   @unique @db.VarChar(50)
-  passwordHash String   @db.VarChar(100)
-  balance      Decimal  @default(10000.00) @db.Decimal(16,2) // 初始资金
-  createdAt    DateTime @default(now())
+  id            Int      @id @default(autoincrement())
+  username      String   @unique @db.VarChar(50)
+  passwordHash  String   @db.VarChar(100)
+  balance       Decimal  @default(10000.00) @db.Decimal(16,2) // 可用资金
+  frozenBalance Decimal  @default(0.00) @db.Decimal(16,2) // 冻结资金
+  createdAt     DateTime @default(now())
 
   // 关联订单
   orders Order[]
@@ -95,13 +96,14 @@ model Trade {
 
 // 持仓表
 model Position {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  symbol    String   @db.VarChar(10) // 股票代码
-  quantity  Int      // 持仓数量
-  avgPrice  Decimal  @db.Decimal(16,2) // 平均成本价
-  updatedAt DateTime @updatedAt
-  createdAt DateTime @default(now())
+  id             Int      @id @default(autoincrement())
+  userId         Int
+  symbol         String   @db.VarChar(10) // 股票代码
+  quantity       Int      // 可用持仓数量
+  frozenQuantity Int      @default(0) // 冻结持仓数量
+  avgPrice       Decimal  @db.Decimal(16,2) // 平均成本价
+  updatedAt      DateTime @updatedAt
+  createdAt      DateTime @default(now())
 
   // 关联用户
   user User @relation(fields: [userId], references: [id])

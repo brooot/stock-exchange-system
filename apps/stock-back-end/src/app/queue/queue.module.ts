@@ -3,7 +3,11 @@ import { BullModule } from '@nestjs/bull';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { QueueService } from './queue.service';
 import { QueueController } from './queue.controller';
-import { OrderProcessor, TradeProcessor, MarketDataProcessor } from './queue.processor';
+import {
+  OrderProcessor,
+  TradeProcessor,
+  MarketDataProcessor,
+} from './queue.processor';
 import { OrderModule } from '../order/order.module';
 import { WebsocketModule } from '../websocket/websocket.module';
 import { KlineModule } from '../kline/kline.module';
@@ -19,10 +23,16 @@ import { KlineModule } from '../kline/kline.module';
           port: configService.get('REDIS_PORT', 6379),
           password: configService.get('REDIS_PASSWORD'),
           maxRetriesPerRequest: 3,
+          // maxRetriesPerRequest: null, // 禁用请求重试限制，让Redis自己处理
+          // retryDelayOnFailover: 1000,
+          // connectTimeout: 30000, // 增加连接超时时间
+          // lazyConnect: true, // 延迟连接，等到真正需要时再连接
+          // retryDelayOnClusterDown: 300,
+          // enableReadyCheck: false, // 禁用ready检查，避免LOADING状态阻塞
         },
         defaultJobOptions: {
-          removeOnComplete: 100,
-          removeOnFail: 50,
+          removeOnComplete: 5,
+          removeOnFail: 10,
           attempts: 3,
           backoff: {
             type: 'exponential',
@@ -37,24 +47,24 @@ import { KlineModule } from '../kline/kline.module';
       {
         name: 'order-processing',
         defaultJobOptions: {
-          removeOnComplete: 100,
-          removeOnFail: 50,
+          removeOnComplete: 5,
+          removeOnFail: 10,
         },
       },
       {
         name: 'trade-processing',
         defaultJobOptions: {
-          removeOnComplete: 200,
-          removeOnFail: 100,
+          removeOnComplete: 5,
+          removeOnFail: 10,
         },
       },
       {
         name: 'market-data-update',
         defaultJobOptions: {
-          removeOnComplete: 50,
-          removeOnFail: 25,
+          removeOnComplete: 5,
+          removeOnFail: 10,
         },
-      },
+      }
     ),
     // 导入依赖模块
     forwardRef(() => OrderModule),

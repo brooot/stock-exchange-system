@@ -25,12 +25,8 @@ RUN pnpm install --prod --frozen-lockfile
 # 清理可能存在的编译缓存
 RUN rm -rf node_modules/.cache
 
-# 重新构建原生模块以确保架构兼容性
-# 只重建bcrypt等必要的原生模块，避免重建开发依赖
-RUN npm rebuild bcrypt --build-from-source
-
-# 验证bcrypt模块是否正确安装
-RUN node -e "console.log('bcrypt test:', require('bcrypt').hashSync('test', 10))"
+# 验证bcryptjs模块是否正确安装
+RUN node -e "console.log('bcryptjs test:', require('bcryptjs').hashSync('test', 10))"
 
 # 直接复制Nx构建好的产物（由project.json中的build任务生成）
 COPY dist/apps/stock-back-end/ ./

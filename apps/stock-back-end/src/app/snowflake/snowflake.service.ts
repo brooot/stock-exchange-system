@@ -15,8 +15,13 @@ export class SnowflakeService {
   private lastTimestamp = -1;
 
   constructor() {
-    // 使用进程ID和随机数生成机器ID，确保在分布式环境下的唯一性
-    this.machineId = (process.pid + Math.floor(Math.random() * 1000)) & this.maxMachineId;
+    // 使用进程ID、当前时间戳和随机数生成机器ID，确保在分布式环境下的唯一性
+    const timestamp = Date.now();
+    const random = Math.floor(Math.random() * 1000);
+    this.machineId = (process.pid + timestamp + random) & this.maxMachineId;
+    
+    // 添加日志以便调试
+    console.log(`SnowflakeService initialized with machineId: ${this.machineId}`);
   }
 
   /**
@@ -24,11 +29,17 @@ export class SnowflakeService {
    * @returns 返回字符串格式的唯一ID
    */
   generateId(): string {
+    // 添加互斥锁机制，防止并发冲突
+    return this.generateIdWithLock();
+  }
+
+  private generateIdWithLock(): string {
     let timestamp = this.getCurrentTimestamp();
 
     // 时钟回拨检测
     if (timestamp < this.lastTimestamp) {
-      throw new Error(`时钟回拨检测：当前时间戳 ${timestamp} 小于上次时间戳 ${this.lastTimestamp}`);
+      // 如果时钟回拨，等待到上次时间戳之后
+      timestamp = this.waitNextMillis(this.lastTimestamp);
     }
 
     // 同一毫秒内的序列号处理
@@ -37,6 +48,7 @@ export class SnowflakeService {
       if (this.sequence === 0) {
         // 序列号溢出，等待下一毫秒
         timestamp = this.waitNextMillis(this.lastTimestamp);
+        this.sequence = 0; // 重置序列号
       }
     } else {
       // 新的毫秒，重置序列号

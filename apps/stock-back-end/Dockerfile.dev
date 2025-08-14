@@ -25,8 +25,10 @@ COPY apps/stock-back-end/tsconfig*.json ./apps/stock-back-end/
 RUN echo 'shamefully-hoist=true' > .npmrc
 RUN echo 'node-linker=hoisted' >> .npmrc
 
-# 安装依赖（包括开发依赖）
-RUN pnpm install --prod --frozen-lockfile
+# 安装所有依赖（包括开发依赖，确保能编译原生模块）
+RUN pnpm install --frozen-lockfile
+
+# bcryptjs是纯JavaScript实现，无需重新构建
 
 # 开发阶段
 FROM deps AS development

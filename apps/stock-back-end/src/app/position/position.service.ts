@@ -60,8 +60,18 @@ export class PositionService {
         });
       } else {
         // 创建新持仓
-        return this.prisma.position.create({
-          data: {
+        return this.prisma.position.upsert({
+          where: {
+            userId_symbol: {
+              userId,
+              symbol,
+            },
+          },
+          update: {
+            quantity,
+            avgPrice: price,
+          },
+          create: {
             userId,
             symbol,
             quantity,

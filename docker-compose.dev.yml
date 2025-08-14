@@ -10,6 +10,12 @@ services:
     networks:
       - app-network
     command: redis-server --appendonly yes
+    healthcheck:
+      test: ['CMD-SHELL', 'redis-cli ping | grep PONG']
+      interval: 3s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
     # 优化容器资源
     deploy:
       resources:
@@ -71,7 +77,7 @@ services:
       - DATABASE_PASSWORD=1123
       - DATABASE_NAME=stock_db
       - DATABASE_SYNC=true
-      - DATABASE_URL=postgresql://postgres:1123@postgres:5432/stock_db?schema=public
+      - DATABASE_URL=postgresql://postgres:1123@postgres:5432/stock_db?schema=public&connection_limit=30&pool_timeout=60&connect_timeout=30&socket_timeout=60
       # Redis 配置
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -99,7 +105,7 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
     # 添加健康检查
     healthcheck:
       test: ['CMD-SHELL', 'curl -f http://localhost:3001/api || exit 1']
