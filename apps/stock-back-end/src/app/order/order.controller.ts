@@ -82,6 +82,6 @@ export class OrderController {
   @Delete(':id')
   async cancelOrder(@Param('id') orderId: string, @Request() req) {
     const userId = req.user.userId;
-    return this.orderService.cancelOrder(orderId, userId);
+    return this.orderService.cancelOrder(parseInt(orderId), userId);
   }
 }

@@ -10,7 +10,7 @@ export interface OrderQueueData {
   method: OrderMethod;
   price: number;
   quantity: number;
-  orderId: string;
+  orderId: number;
   timestamp: number;
 }
 

@@ -85,7 +85,7 @@ export class TradeService {
       select: { price: true },
     });
 
-    if (latestTrade) {
+    if (latestTrade && latestTrade.price !== null) {
       return latestTrade.price.toNumber();
     }
 
@@ -95,7 +95,7 @@ export class TradeService {
       select: { price: true },
     });
 
-    return latestOrder ? latestOrder.price.toNumber() : 150.0; // 默认价格
+    return latestOrder && latestOrder.price !== null ? latestOrder.price.toNumber() : 150.0; // 默认价格
   }
 
   // 获取市场数据
@@ -119,17 +119,32 @@ export class TradeService {
       };
     }
 
-    // 计算市场数据
-    const prices = recentTrades.map((trade) =>
+    // 计算市场数据，过滤掉价格为 null 的交易记录
+    const validTrades = recentTrades.filter(trade => trade.price !== null);
+    if (validTrades.length === 0) {
+      // 如果没有有效的交易记录，返回默认数据
+      return {
+        symbol: 'AAPL',
+        price: 150.0,
+        change: 0,
+        changePercent: 0,
+        volume: 0,
+        high: 150.0,
+        low: 150.0,
+        open: 150.0,
+      };
+    }
+    
+    const prices = validTrades.map((trade) =>
       parseFloat(trade.price.toString())
     );
     const currentPrice = prices[0]; // 最新价格
-    const volumes = recentTrades.map((trade) => trade.quantity);
+    const volumes = validTrades.map((trade) => trade.quantity);
     const totalVolume = volumes.reduce((sum, vol) => sum + vol, 0);
 
     // 计算今日开盘价（假设为24小时前的价格，如果没有则使用当前价格）
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const dayStartTrades = recentTrades.filter(
+    const dayStartTrades = validTrades.filter(
       (trade) => new Date(trade.executedAt) >= oneDayAgo
     );
     const openPrice =

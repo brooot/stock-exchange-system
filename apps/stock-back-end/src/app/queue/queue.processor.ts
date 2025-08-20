@@ -13,7 +13,7 @@ export class OrderProcessor {
 
   constructor(private orderService: OrderService) {}
 
-  @Process('process-order')
+  @Process({ name: 'process-order', concurrency: 1 })
   async processOrder(job: Job<OrderQueueData>) {
     const { userId, symbol, type, method, price, quantity, orderId } = job.data;
 
@@ -21,14 +21,14 @@ export class OrderProcessor {
       // this.logger.debug(`Processing order ${orderId} for user ${userId}`);
 
       // 处理订单撮合（传递orderId确保使用相同的订单ID）
-      const result = await this.orderService.createOrderSync(
+      const result = await this.orderService.handleOrderSync(
+        orderId,
         userId,
         symbol,
         type,
         method,
         price,
-        quantity,
-        orderId
+        quantity
       );
 
       // this.logger.debug(

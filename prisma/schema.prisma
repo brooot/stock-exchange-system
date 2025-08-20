@@ -25,6 +25,7 @@ enum OrderMethod {
 
 // 订单状态枚举
 enum OrderStatus {
+  PENDING         // 待处理
   OPEN             // 开放
   PARTIALLY_FILLED // 部分成交
   FILLED           // 已成交
@@ -50,7 +51,7 @@ model User {
 
 // 订单表
 model Order {
-  id              String      @id @default(uuid())
+  id              Int         @id @default(autoincrement())
   userId          Int
   symbol          String      @db.VarChar(10) // 股票代码
   type            OrderType   // BUY, SELL
@@ -59,6 +60,8 @@ model Order {
   quantity        Int         // 原始订单数量
   filledQuantity  Int         @default(0) // 已成交数量
   avgFilledPrice  Decimal?    @db.Decimal(16,2) // 平均成交价
+  frozenAmount    Decimal     @default(0.00) @db.Decimal(16,2) // 该订单冻结的资金数量
+  actualUsedAmount Decimal    @default(0.00) @db.Decimal(16,2) // 实际使用的资金金额
   status          OrderStatus @default(OPEN)
   createdAt       DateTime    @default(now())
 
@@ -79,8 +82,8 @@ model Order {
 // 交易记录表
 model Trade {
   id          Int      @id @default(autoincrement())
-  buyOrderId  String
-  sellOrderId String
+  buyOrderId  Int
+  sellOrderId Int
   price       Decimal  @db.Decimal(16,2)
   quantity    Int
   executedAt  DateTime @default(now())
