@@ -1,0 +1,114 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install pnpm
+      uses: pnpm/action-setup@v2
+      with:
+        version: 10
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        cache: 'pnpm'
+
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+
+    - name: Generate Prisma client
+      run: pnpm prisma generate
+
+    - name: Run tests
+      run: |
+        pnpm nx test stock-back-end --passWithNoTests
+
+    - name: Build applications
+      run: |
+        pnpm nx build stock-back-end
+        pnpm nx build stock-fe
+
+    - name: Build and push Docker images
+      if: github.ref == 'refs/heads/main'
+      run: |
+        # 登录镜像仓库
+        echo ${{ secrets.DOCKER_PASSWORD }} | docker login ${{ secrets.DOCKER_REGISTRY }} -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+
+        # 构建后端镜像
+        docker build --platform linux/amd64 \
+          -f apps/stock-back-end/Dockerfile \
+          -t ${{ secrets.DOCKER_REGISTRY }}/${{ secrets.DOCKER_NAMESPACE }}/${{ secrets.DOCKER_REPO_NAME }}:backend-latest .
+
+        # 构建前端镜像（添加环境变量）
+        docker build --platform linux/amd64 \
+          --build-arg NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL || 'https://www.brooot.top' }} \
+          --build-arg NEXT_PUBLIC_WS_URL=${{ secrets.NEXT_PUBLIC_WS_URL || 'wss://www.brooot.top' }} \
+          -f apps/stock-fe/Dockerfile \
+          -t ${{ secrets.DOCKER_REGISTRY }}/${{ secrets.DOCKER_NAMESPACE }}/${{ secrets.DOCKER_REPO_NAME }}:frontend-latest .
+
+        # 推送镜像
+        docker push ${{ secrets.DOCKER_REGISTRY }}/${{ secrets.DOCKER_NAMESPACE }}/${{ secrets.DOCKER_REPO_NAME }}:backend-latest
+        docker push ${{ secrets.DOCKER_REGISTRY }}/${{ secrets.DOCKER_NAMESPACE }}/${{ secrets.DOCKER_REPO_NAME }}:frontend-latest
+
+    - name: Deploy to server
+      if: github.ref == 'refs/heads/main'
+      uses: appleboy/ssh-action@v0.1.5
+      with:
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USERNAME }}
+        key: ${{ secrets.KEY }}
+        port: ${{ secrets.PORT || 22 }}
+        script: |
+          cd ${{ secrets.PROJECT_PATH || '~/projects/stock-exchange-system' }}
+
+          # 拉取最新代码
+          pwd
+          git pull --rebase
+
+          # 停止现有服务
+          docker compose -f docker-compose.prod.yml --env-file .env.production down
+
+          # 登录镜像仓库
+          echo ${{ secrets.DOCKER_PASSWORD }} | docker login ${{ secrets.DOCKER_REGISTRY }} -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+
+          # 拉取最新镜像
+          echo "拉取最新镜像..."
+          docker pull ${{ secrets.DOCKER_REGISTRY }}/${{ secrets.DOCKER_NAMESPACE }}/${{ secrets.DOCKER_REPO_NAME }}:backend-latest
+          docker pull ${{ secrets.DOCKER_REGISTRY }}/${{ secrets.DOCKER_NAMESPACE }}/${{ secrets.DOCKER_REPO_NAME }}:frontend-latest
+
+          # 清理无用的Docker镜像
+          echo "清理无用的Docker镜像..."
+          docker image prune -f
+          # 删除tag为<none>的镜像
+          docker images | grep "<none>" | awk '{print $3}' | xargs -r docker rmi
+
+          # 启动服务
+          echo "启动服务..."
+          docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+
+          # 检查服务状态
+          echo "检查服务状态:"
+          docker compose -f docker-compose.prod.yml --env-file .env.production ps
+
+          echo "✅ 部署完成"
+
+    - name: Notify deployment status
+      if: always()
+      run: |
+        if [ "${{ job.status }}" == "success" ]; then
+          echo "✅ Deployment successful!"
+        else
+          echo "❌ Deployment failed!"
+        fi

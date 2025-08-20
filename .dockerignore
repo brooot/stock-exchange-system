@@ -1,0 +1,96 @@
+# Git
+.git
+.gitignore
+
+# Node modules
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs (保留dist目录用于生产构建)
+build
+.next
+
+# 开发相关文件
+*.dev.*
+Dockerfile.dev
+docker-compose.dev.yml
+
+# Cache directories
+.nx
+.pnpm-store
+.cache
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs
+*.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage
+
+# Environment files (except development)
+.env
+.env.local
+.env.production
+.env.test
+
+# Documentation
+*.md
+README*
+CHANGELOG*
+
+# Test files
+**/*.test.ts
+**/*.test.js
+**/*.spec.ts
+**/*.spec.js
+__tests__
+
+# Docker files (avoid recursion)
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Scripts (not needed in container)
+scripts
+
+# 开发和测试相关目录
+apps/stock-back-end-e2e
+apps/*/specs
+apps/*/rest-test
+
+# 配置文件（容器内不需要）
+.editorconfig
+.prettierrc
+.prettierignore
+eslint.config.mjs
+jest.config.ts
+jest.preset.js
+.vercel
+.trae
+
+# 大文件和不必要的依赖
+*.tar.gz
+*.zip
+*.rar
+
+# Temporary files
+tmp
+temp

@@ -1,0 +1,55 @@
+{
+  "name": "stock-back-end",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/stock-back-end/src",
+  "projectType": "application",
+  "tags": [],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "webpack-cli build",
+        "args": [
+          "--node-env=production"
+        ],
+        "env": {
+          "NODE_ENV": "production"
+        }
+      },
+      "configurations": {
+        "development": {
+          "args": [
+            "--node-env=development"
+          ],
+          "env": {
+            "NODE_ENV": "development"
+          }
+        }
+      }
+    },
+    "serve": {
+      "executor": "@nx/js:node",
+      "defaultConfiguration": "development",
+      "dependsOn": [
+        "build"
+      ],
+      "options": {
+        "buildTarget": "stock-back-end:build",
+        "runBuildTargetDependencies": false
+      },
+      "configurations": {
+        "development": {
+          "buildTarget": "stock-back-end:build:development"
+        },
+        "production": {
+          "buildTarget": "stock-back-end:build:production"
+        }
+      }
+    },
+    "test": {
+      "options": {
+        "passWithNoTests": true
+      }
+    }
+  }
+}

@@ -1,0 +1,165 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x", "debian-openssl-3.0.x" ]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 交易类型枚举
+enum OrderType {
+  BUY   // 买入
+  SELL  // 卖出
+}
+
+// 订单方式枚举
+enum OrderMethod {
+  MARKET // 市价单
+  LIMIT  // 限价单
+}
+
+// 订单状态枚举
+enum OrderStatus {
+  OPEN             // 开放
+  PARTIALLY_FILLED // 部分成交
+  FILLED           // 已成交
+  CANCELLED        // 已取消
+}
+
+// 用户表
+model User {
+  id            Int      @id @default(autoincrement())
+  username      String   @unique @db.VarChar(50)
+  passwordHash  String   @db.VarChar(100)
+  balance       Decimal  @default(10000.00) @db.Decimal(16,2) // 可用资金
+  frozenBalance Decimal  @default(0.00) @db.Decimal(16,2) // 冻结资金
+  createdAt     DateTime @default(now())
+
+  // 关联订单
+  orders Order[]
+  // 关联持仓
+  positions Position[]
+
+  @@map("users")
+}
+
+// 订单表
+model Order {
+  id              String      @id @default(uuid())
+  userId          Int
+  symbol          String      @db.VarChar(10) // 股票代码
+  type            OrderType   // BUY, SELL
+  method          OrderMethod @default(LIMIT) // MARKET, LIMIT
+  price           Decimal?    @db.Decimal(16,2) // 限价单必填，市价单为null
+  quantity        Int         // 原始订单数量
+  filledQuantity  Int         @default(0) // 已成交数量
+  avgFilledPrice  Decimal?    @db.Decimal(16,2) // 平均成交价
+  status          OrderStatus @default(OPEN)
+  createdAt       DateTime    @default(now())
+
+  // 关联用户
+  user User @relation(fields: [userId], references: [id])
+
+  // 关联交易记录
+  buyTrades  Trade[] @relation("BuyOrder")
+  sellTrades Trade[] @relation("SellOrder")
+
+  @@index([userId])
+  @@index([symbol])
+  @@index([status])
+  @@index([createdAt])
+  @@map("orders")
+}
+
+// 交易记录表
+model Trade {
+  id          Int      @id @default(autoincrement())
+  buyOrderId  String
+  sellOrderId String
+  price       Decimal  @db.Decimal(16,2)
+  quantity    Int
+  executedAt  DateTime @default(now())
+
+  // 关联订单
+  buyOrder  Order @relation("BuyOrder", fields: [buyOrderId], references: [id])
+  sellOrder Order @relation("SellOrder", fields: [sellOrderId], references: [id])
+
+  @@index([buyOrderId])
+  @@index([sellOrderId])
+  @@index([executedAt])
+  @@map("trades")
+}
+
+// 持仓表
+model Position {
+  id             Int      @id @default(autoincrement())
+  userId         Int
+  symbol         String   @db.VarChar(10) // 股票代码
+  quantity       Int      // 可用持仓数量
+  frozenQuantity Int      @default(0) // 冻结持仓数量
+  avgPrice       Decimal  @db.Decimal(16,2) // 平均成本价
+  updatedAt      DateTime @updatedAt
+  createdAt      DateTime @default(now())
+
+  // 关联用户
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, symbol]) // 每个用户每个股票只能有一条持仓记录
+  @@index([userId])
+  @@index([symbol])
+  @@map("positions")
+}
+
+// K线周期类型枚举
+enum KlineInterval {
+  M1   // 1分钟
+  M5   // 5分钟
+  M15  // 15分钟
+  H1   // 1小时
+  D1   // 1天
+}
+
+// K线数据表（基础周期：1分钟）
+model KlineBase {
+  id        Int      @id @default(autoincrement())
+  symbol    String   @db.VarChar(10) // 股票代码
+  timestamp DateTime // K线时间戳（分钟级别对齐）
+  open      Decimal  @db.Decimal(16,4) // 开盘价
+  high      Decimal  @db.Decimal(16,4) // 最高价
+  low       Decimal  @db.Decimal(16,4) // 最低价
+  close     Decimal  @db.Decimal(16,4) // 收盘价
+  volume    Int      // 成交量
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([symbol, timestamp]) // 每个股票每分钟只能有一条记录
+  @@index([symbol, timestamp])
+  @@index([timestamp])
+  @@map("kline_base")
+}
+
+// K线数据表（高级周期：5分钟、15分钟、1小时、1天）
+model KlineAggregated {
+  id        Int           @id @default(autoincrement())
+  symbol    String        @db.VarChar(10) // 股票代码
+  interval  KlineInterval // 时间周期
+  timestamp DateTime      // K线时间戳（按周期对齐）
+  open      Decimal       @db.Decimal(16,4) // 开盘价
+  high      Decimal       @db.Decimal(16,4) // 最高价
+  low       Decimal       @db.Decimal(16,4) // 最低价
+  close     Decimal       @db.Decimal(16,4) // 收盘价
+  volume    Int           // 成交量
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@unique([symbol, interval, timestamp]) // 每个股票每个周期每个时间点只能有一条记录
+  @@index([symbol, interval, timestamp])
+  @@index([timestamp])
+  @@map("kline_aggregated")
+}
+

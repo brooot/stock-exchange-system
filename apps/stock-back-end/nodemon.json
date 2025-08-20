@@ -1,0 +1,17 @@
+{
+  "watch": [
+    "src"
+  ],
+  "ext": "ts,js,json",
+  "ignore": [
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "**/node_modules",
+    "**/.nx"
+  ],
+  "delay": 8000,
+  "exec": "cd /app && nx build stock-back-end --configuration=development && node dist/apps/stock-back-end/main.js",
+  "env": {
+    "NODE_ENV": "development"
+  }
+}

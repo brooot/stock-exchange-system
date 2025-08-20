@@ -1,0 +1,146 @@
+services:
+  # Redis 缓存和消息队列服务
+  redis:
+    image: redis:7-alpine
+    container_name: stock-redis-dev
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis-data:/data
+    networks:
+      - app-network
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ['CMD-SHELL', 'redis-cli ping | grep PONG']
+      interval: 3s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    # 优化容器资源
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+
+  # PostgreSQL 数据库服务
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 1123
+      POSTGRES_DB: stock_db
+      # 优化PostgreSQL性能
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    env_file:
+      - .env.development
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # 添加PostgreSQL配置优化
+      - ./docker/postgres.conf:/etc/postgresql/postgresql.conf:ro
+    networks:
+      - app-network
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d stock_db']
+      interval: 3s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    # 优化容器资源
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
+
+  # 后端开发服务
+  stock-back-end-dev:
+    build:
+      context: .
+      dockerfile: apps/stock-back-end/Dockerfile.dev
+      target: development
+    ports:
+      - '3001:3001'
+      - '443:443'   # HTTPS端口
+      - '9229:9229' # 调试端口
+    env_file:
+      - .env.development
+    environment:
+      - NODE_ENV=development
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_USERNAME=postgres
+      - DATABASE_PASSWORD=1123
+      - DATABASE_NAME=stock_db
+      - DATABASE_SYNC=true
+      - DATABASE_URL=postgresql://postgres:1123@postgres:5432/stock_db?schema=public&connection_limit=30&pool_timeout=60&connect_timeout=30&socket_timeout=60
+      # Redis 配置
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      # 优化Node.js性能
+      - NODE_OPTIONS=--max-old-space-size=512
+    volumes:
+      # 挂载源代码目录以确保热重载正常工作
+      - ./apps/stock-back-end:/app/apps/stock-back-end:cached
+      - ./apps/stock-back-end-e2e:/app/apps/stock-back-end-e2e:cached
+      - ./prisma:/app/prisma:cached
+      - ./package.json:/app/package.json:ro
+      - ./pnpm-lock.yaml:/app/pnpm-lock.yaml:ro
+      - ./nx.json:/app/nx.json:ro
+      - ./tsconfig.base.json:/app/tsconfig.base.json:ro
+      # 挂载SSL证书目录
+      - ./certs:/app/certs:ro
+      # 使用命名卷避免覆盖容器内的关键目录
+      - node_modules_cache:/app/node_modules
+      - nx_cache:/app/.nx
+      - dist_cache:/app/dist
+      - pnpm_cache:/app/.pnpm-store
+    networks:
+      - app-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    # 添加健康检查
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -f http://localhost:3001/api || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # 优化容器资源
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 600M
+        reservations:
+          cpus: '0.4'
+          memory: 300M
+    # 启用init进程
+    init: true
+
+networks:
+  app-network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.driver.mtu: 1500
+
+volumes:
+  postgres-data:
+    driver: local
+  redis-data:
+    driver: local
+  node_modules_cache:
+    driver: local
+  nx_cache:
+    driver: local
+  dist_cache:
+    driver: local
+  pnpm_cache:
+    driver: local
