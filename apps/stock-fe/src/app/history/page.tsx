@@ -115,21 +115,19 @@ export default function HistoryPage() {
             <nav className="-mb-px flex space-x-8">
               <button
                 onClick={() => setActiveTab('orders')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'orders'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'orders'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
               >
                 我的订单 ({orders.length})
               </button>
               <button
                 onClick={() => setActiveTab('trades')}
-                className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === 'trades'
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'trades'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
               >
                 成交记录 ({trades.length})
               </button>
@@ -193,12 +191,11 @@ export default function HistoryPage() {
                         {orders.map((order) => (
                           <tr key={order.id}>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
-                              {order.id.substring(0, 8)}...
+                              {order.id}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm">
-                              <span className={`font-medium ${
-                                order.type === 'BUY' ? 'text-green-600' : 'text-red-600'
-                              }`}>
+                              <span className={`font-medium ${order.type === 'BUY' ? 'text-green-600' : 'text-red-600'
+                                }`}>
                                 {order.type === 'BUY' ? '买入' : '卖出'}
                               </span>
                             </td>
@@ -215,9 +212,8 @@ export default function HistoryPage() {
                               {order.avgFilledPrice ? `$${order.avgFilledPrice.toFixed(2)}` : '-'}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                getStatusColor(order.status)
-                              }`}>
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(order.status)
+                                }`}>
                                 {getStatusText(order.status)}
                               </span>
                             </td>
