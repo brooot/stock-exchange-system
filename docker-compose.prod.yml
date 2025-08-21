@@ -79,12 +79,10 @@ services:
       - REDIS_PORT=${REDIS_PORT:-6379}
       - REDIS_PASSWORD=${REDIS_PASSWORD:-}
       - NODE_OPTIONS=--max-old-space-size=512
+      - ENABLE_HTTPS=false
     # 不直接暴露端口，通过nginx代理
     expose:
       - '3001'
-      - '443'
-    volumes:
-      - ./certs:/app/certs:ro # 挂载SSL证书目录
     depends_on:
       postgres:
         condition: service_healthy

@@ -58,10 +58,6 @@ RUN pnpm install --prod --frozen-lockfile --prefer-offline && \
     pnpm store prune && \
     rm -rf ~/.pnpm-store
 
-# 创建证书目录并复制SSL证书文件
-RUN mkdir -p /app/certificates
-COPY --chown=nextjs:nodejs certs/ /app/certificates/
-
 # 复制构建产物
 COPY --from=builder --chown=nextjs:nodejs /app/dist/apps/stock-fe/.next ./.next
 COPY --from=builder /app/dist/apps/stock-fe/public ./public
