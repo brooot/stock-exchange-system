@@ -25,6 +25,15 @@ export interface BatchTradeProcessingData {
   timestamp: number;
 }
 
+// 新增：市场数据更新类型与 Job 载荷类型
+export type MarketUpdateType = 'price' | 'market';
+export interface MarketDataUpdateJob {
+  symbol: string;
+  updateType: MarketUpdateType;
+  data: any;
+  timestamp: number;
+}
+
 @Injectable()
 export class QueueService implements OnModuleInit, OnModuleDestroy {
   private cleanupTimer: NodeJS.Timeout;
@@ -64,6 +73,32 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  // 添加市场数据更新到队列
+  async addMarketDataUpdate(
+    symbol: string,
+    updateType: MarketUpdateType,
+    data: any
+  ): Promise<void> {
+    await this.marketDataQueue.add(
+      'update-market-data',
+      {
+        symbol,
+        updateType,
+        data,
+        timestamp: Date.now(),
+      } as MarketDataUpdateJob,
+      {
+        attempts: 3,
+        backoff: {
+          type: 'fixed',
+          delay: 500,
+        },
+        removeOnComplete: 5,
+        removeOnFail: 10,
+      }
+    );
+  }
+
   // 添加高优先级订单（市价单）
   async addHighPriorityOrder(orderData: OrderQueueData): Promise<void> {
     await this.addOrderToQueue(orderData, 10);
@@ -82,32 +117,6 @@ export class QueueService implements OnModuleInit, OnModuleDestroy {
       removeOnComplete: 5,
       removeOnFail: 10,
     });
-  }
-
-  // 添加市场数据更新到队列
-  async addMarketDataUpdate(
-    symbol: string,
-    updateType: string,
-    data: any
-  ): Promise<void> {
-    await this.marketDataQueue.add(
-      'update-market-data',
-      {
-        symbol,
-        updateType,
-        data,
-        timestamp: Date.now(),
-      },
-      {
-        attempts: 3,
-        backoff: {
-          type: 'fixed',
-          delay: 500,
-        },
-        removeOnComplete: 5,
-        removeOnFail: 10,
-      }
-    );
   }
 
   // 获取队列状态

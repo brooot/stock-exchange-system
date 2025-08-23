@@ -109,22 +109,22 @@ export class OrderService {
         },
       });
 
-      console.log(
-        `[订单创建] --------------- 用户${userId} 创建订单${order.id} --------------- \n` +
-          `类型: ${type}, 方法: ${method}, 股票: ${symbol}, ` +
-          `价格: ${
-            price ? price.toFixed(2) : '市价'
-          }, 数量: ${quantity}, 状态: PENDING`
-      );
+      // console.log(
+      //   `[订单创建] --------------- 用户${userId} 创建订单${order.id} --------------- \n` +
+      //     `类型: ${type}, 方法: ${method}, 股票: ${symbol}, ` +
+      //     `价格: ${
+      //       price ? price.toFixed(2) : '市价'
+      //     }, 数量: ${quantity}, 状态: PENDING`
+      // );
 
       // 订单创建成功后，立即冻结资金或持仓
       if (type === OrderType.BUY) {
         // 买单：冻结资金
-        console.log(
-          `[订单创建事务] 用户${userId} 订单${
-            order.id
-          } 开始冻结资金 - 金额: ${requiredAmount.toFixed(2)}`
-        );
+        // console.log(
+        //   `[订单创建事务] 用户${userId} 订单${
+        //     order.id
+        //   } 开始冻结资金 - 金额: ${requiredAmount.toFixed(2)}`
+        // );
 
         const userBeforeUpdate = await tx.user.findUnique({
           where: { id: userId },
@@ -139,24 +139,24 @@ export class OrderService {
           select: { balance: true, frozenBalance: true },
         });
 
-        console.log(
-          `[订单创建事务] 用户${userId} 资金冻结完成 - ` +
-            `冻结前: 余额${userBeforeUpdate.balance
-              .toNumber()
-              .toFixed(2)}, 冻结${userBeforeUpdate.frozenBalance
-              .toNumber()
-              .toFixed(2)}, ` +
-            `冻结后: 余额${userAfterUpdate.balance
-              .toNumber()
-              .toFixed(2)}, 冻结${userAfterUpdate.frozenBalance
-              .toNumber()
-              .toFixed(2)}`
-        );
+        // console.log(
+        //   `[订单创建事务] 用户${userId} 资金冻结完成 - ` +
+        //     `冻结前: 余额${userBeforeUpdate.balance
+        //       .toNumber()
+        //       .toFixed(2)}, 冻结${userBeforeUpdate.frozenBalance
+        //       .toNumber()
+        //       .toFixed(2)}, ` +
+        //     `冻结后: 余额${userAfterUpdate.balance
+        //       .toNumber()
+        //       .toFixed(2)}, 冻结${userAfterUpdate.frozenBalance
+        //       .toNumber()
+        //       .toFixed(2)}`
+        // );
       } else {
         // 卖单：冻结持仓
-        console.log(
-          `[订单创建事务] 用户${userId} 订单${order.id} 开始冻结持仓 - 股票: ${symbol}, 数量: ${quantity}`
-        );
+        // console.log(
+        //   `[订单创建事务] 用户${userId} 订单${order.id} 开始冻结持仓 - 股票: ${symbol}, 数量: ${quantity}`
+        // );
 
         const positionBeforeUpdate = await tx.position.findUnique({
           where: { userId_symbol: { userId, symbol } },
@@ -171,20 +171,20 @@ export class OrderService {
           tx
         );
 
-        const positionAfterUpdate = await tx.position.findUnique({
-          where: { userId_symbol: { userId, symbol } },
-          select: { quantity: true, frozenQuantity: true },
-        });
+        // const positionAfterUpdate = await tx.position.findUnique({
+        //   where: { userId_symbol: { userId, symbol } },
+        //   select: { quantity: true, frozenQuantity: true },
+        // });
 
-        console.log(
-          `[订单创建事务] 用户${userId} 持仓冻结完成 - ` +
-            `冻结前: 持仓${positionBeforeUpdate?.quantity || 0}, 冻结${
-              positionBeforeUpdate?.frozenQuantity || 0
-            }, ` +
-            `冻结后: 持仓${positionAfterUpdate?.quantity || 0}, 冻结${
-              positionAfterUpdate?.frozenQuantity || 0
-            }`
-        );
+        // console.log(
+        //   `[订单创建事务] 用户${userId} 持仓冻结完成 - ` +
+        //     `冻结前: 持仓${positionBeforeUpdate?.quantity || 0}, 冻结${
+        //       positionBeforeUpdate?.frozenQuantity || 0
+        //     }, ` +
+        //     `冻结后: 持仓${positionAfterUpdate?.quantity || 0}, 冻结${
+        //       positionAfterUpdate?.frozenQuantity || 0
+        //     }`
+        // );
       }
 
       return order;
@@ -206,9 +206,9 @@ export class OrderService {
       },
       { priority }
     );
-    console.log(
-      `[订单创建] ----------- 订单${createdOrder.id} 已添加到队列 -----------`
-    );
+    // console.log(
+    //   `[订单创建] ----------- 订单${createdOrder.id} 已添加到队列 -----------`
+    // );
 
     return {
       id: createdOrder.id, // 返回订单ID
@@ -227,9 +227,9 @@ export class OrderService {
     price: number | undefined,
     quantity: number
   ) {
-    console.log(
-      `[订单处理] ------------------------------ 开始处理订单${orderId} ------------------------------ \n`
-    );
+    // console.log(
+    //   `[订单处理] ------------------------------ 开始处理订单${orderId} ------------------------------ \n`
+    // );
     // 验证输入 - 市价单可以不传price
     this.validateOrderInput(method, price, quantity);
 
@@ -255,20 +255,20 @@ export class OrderService {
           data: { status: OrderStatus.OPEN },
         });
 
-        console.log(
-          `[订单处理] 开始处理订单${orderId} - ` +
-            `类型: ${type}, 方法: ${method}, 股票: ${symbol}, ` +
-            `价格: ${price ? price.toFixed(2) : '市价'}, 数量: ${quantity}`
-        );
+        // console.log(
+        //   `[订单处理] 开始处理订单${orderId} - ` +
+        //     `类型: ${type}, 方法: ${method}, 股票: ${symbol}, ` +
+        //     `价格: ${price ? price.toFixed(2) : '市价'}, 数量: ${quantity}`
+        // );
 
         // 尝试撮合，传入事务参数避免嵌套
         const matchResult = await this.matchOrder(updatedOrder, prisma);
 
         // 🔧 修复市价订单状态更新问题：将matchOrder返回的finalStatus更新到数据库
         if (matchResult.finalStatus !== updatedOrder.status) {
-          console.log(
-            `[订单状态更新] 订单${updatedOrder.id} 状态从 ${updatedOrder.status} 更新为 ${matchResult.finalStatus}`
-          );
+          // console.log(
+          //   `[订单状态更新] 订单${updatedOrder.id} 状态从 ${updatedOrder.status} 更新为 ${matchResult.finalStatus}`
+          // );
 
           await prisma.order.update({
             where: { id: updatedOrder.id },
@@ -278,9 +278,9 @@ export class OrderService {
             },
           });
         }
-        console.log(
-          `[订单处理] ------------------------------ 订单${updatedOrder.id} 处理完成 ------------------------------ \n`
-        );
+        // console.log(
+        //   `[订单处理] ------------------------------ 订单${updatedOrder.id} 处理完成 ------------------------------ \n`
+        // );
         return {
           id: updatedOrder.id,
           status: matchResult.finalStatus,
@@ -360,16 +360,16 @@ export class OrderService {
 
         unfilledAmount = remainingFrozen;
 
-        console.log(
-          `[解冻资源] 市价买单${order.id} 解冻计算 - ` +
-            `订单冻结: ${orderFrozenAmount.toFixed(
-              2
-            )}, 已使用: ${usedAmount.toFixed(2)}, ` +
-            `剩余冻结: ${remainingFrozen.toFixed(
-              2
-            )}, 当前用户冻结: ${currentFrozenBalance.toFixed(2)}, ` +
-            `实际解冻: ${unfilledAmount.toFixed(2)}`
-        );
+        // console.log(
+        //   `[解冻资源] 市价买单${order.id} 解冻计算 - ` +
+        //     `订单冻结: ${orderFrozenAmount.toFixed(
+        //       2
+        //     )}, 已使用: ${usedAmount.toFixed(2)}, ` +
+        //     `剩余冻结: ${remainingFrozen.toFixed(
+        //       2
+        //     )}, 当前用户冻结: ${currentFrozenBalance.toFixed(2)}, ` +
+        //     `实际解冻: ${unfilledAmount.toFixed(2)}`
+        // );
       } else {
         // 限价买单：使用frozenAmount减去已使用的金额
         const usedAmount = order.actualUsedAmount?.toNumber() || 0;
@@ -405,42 +405,42 @@ export class OrderService {
 
         unfilledAmount = remainingFrozen;
 
-        console.log(
-          `[解冻资源] 限价买单${order.id} 解冻计算 - ` +
-            `订单冻结: ${orderFrozenAmount.toFixed(
-              2
-            )}, 已使用: ${usedAmount.toFixed(2)}, ` +
-            `剩余冻结: ${remainingFrozen.toFixed(
-              2
-            )}, 当前用户冻结: ${currentFrozenBalance.toFixed(2)}, ` +
-            `实际解冻: ${unfilledAmount.toFixed(2)}`
-        );
+        // console.log(
+        //   `[解冻资源] 限价买单${order.id} 解冻计算 - ` +
+        //     `订单冻结: ${orderFrozenAmount.toFixed(
+        //       2
+        //     )}, 已使用: ${usedAmount.toFixed(2)}, ` +
+        //     `剩余冻结: ${remainingFrozen.toFixed(
+        //       2
+        //     )}, 当前用户冻结: ${currentFrozenBalance.toFixed(2)}, ` +
+        //     `实际解冻: ${unfilledAmount.toFixed(2)}`
+        // );
       }
     } else {
       // 卖单：解冻股票，不计算未成交金额（不依赖价格），仅按未成交数量解冻持仓
       unfilledAmount = 0;
     }
 
-    console.log(
-      `[解冻资源] 订单${order.id} 计算解冻量 - ` +
-        `未成交数量: ${actualUnfilledQuantity}, 未成交金额: ${
-          order.type === OrderType.SELL ? 'N/A' : unfilledAmount.toFixed(2)
-        } (${
-          order.method === OrderMethod.MARKET && order.type === OrderType.BUY
-            ? '市价买单-剩余冻结资金'
-            : '基于价格计算'
-        })`
-    );
+    // console.log(
+    //   `[解冻资源] 订单${order.id} 计算解冻量 - ` +
+    //     `未成交数量: ${actualUnfilledQuantity}, 未成交金额: ${
+    //       order.type === OrderType.SELL ? 'N/A' : unfilledAmount.toFixed(2)
+    //     } (${
+    //       order.method === OrderMethod.MARKET && order.type === OrderType.BUY
+    //         ? '市价买单-剩余冻结资金'
+    //         : '基于价格计算'
+    //     })`
+    // );
 
     // 解冻相应的资金或股票
     if (order.type === OrderType.BUY) {
       // 买单：解冻资金
       if (unfilledAmount > 0) {
-        console.log(
-          `[解冻资源] 订单${
-            order.id
-          } 开始解冻资金 - 金额: ${unfilledAmount.toFixed(2)}`
-        );
+        // console.log(
+        //   `[解冻资源] 订单${
+        //     order.id
+        //   } 开始解冻资金 - 金额: ${unfilledAmount.toFixed(2)}`
+        // );
 
         // 先查询实际冻结余额
         const user = await prisma.user.findUnique({
@@ -455,19 +455,19 @@ export class OrderService {
             : (frozenBalanceRaw as any).toNumber();
         const actualFrozenAmount = Math.min(unfilledAmount, frozenBalanceNum);
 
-        console.log(
-          `[解冻资源] 订单${
-            order.id
-          } 实际解冻金额: ${actualFrozenAmount.toFixed(
-            2
-          )}, 当前冻结余额: ${frozenBalanceNum.toFixed(2)}`
-        );
+        // console.log(
+        //   `[解冻资源] 订单${
+        //     order.id
+        //   } 实际解冻金额: ${actualFrozenAmount.toFixed(
+        //     2
+        //   )}, 当前冻结余额: ${frozenBalanceNum.toFixed(2)}`
+        // );
 
         if (actualFrozenAmount > 0) {
-          const userBeforeUnfreeze = await prisma.user.findUnique({
-            where: { id: userId },
-            select: { balance: true, frozenBalance: true },
-          });
+          // const userBeforeUnfreeze = await prisma.user.findUnique({
+          //   where: { id: userId },
+          //   select: { balance: true, frozenBalance: true },
+          // });
 
           await this.userService.unfreezeBalance(
             userId,
@@ -475,32 +475,32 @@ export class OrderService {
             prisma
           );
 
-          const userAfterUnfreeze = await prisma.user.findUnique({
-            where: { id: userId },
-            select: { balance: true, frozenBalance: true },
-          });
+          // const userAfterUnfreeze = await prisma.user.findUnique({
+          //   where: { id: userId },
+          //   select: { balance: true, frozenBalance: true },
+          // });
 
-          console.log(
-            `[解冻资源] 订单${order.id} 资金解冻完成 - ` +
-              `解冻前: 余额${userBeforeUnfreeze.balance
-                .toNumber()
-                .toFixed(2)}, 冻结${userBeforeUnfreeze.frozenBalance
-                .toNumber()
-                .toFixed(2)}, ` +
-              `解冻后: 余额${userAfterUnfreeze.balance
-                .toNumber()
-                .toFixed(2)}, 冻结${userAfterUnfreeze.frozenBalance
-                .toNumber()
-                .toFixed(2)}`
-          );
+          // console.log(
+          //   `[解冻资源] 订单${order.id} 资金解冻完成 - ` +
+          //     `解冻前: 余额${userBeforeUnfreeze.balance
+          //       .toNumber()
+          //       .toFixed(2)}, 冻结${userBeforeUnfreeze.frozenBalance
+          //       .toNumber()
+          //       .toFixed(2)}, ` +
+          //     `解冻后: 余额${userAfterUnfreeze.balance
+          //       .toNumber()
+          //       .toFixed(2)}, 冻结${userAfterUnfreeze.frozenBalance
+          //       .toNumber()
+          //       .toFixed(2)}`
+          // );
         }
       }
     } else {
       // 卖单：解冻股票
       if (actualUnfilledQuantity > 0) {
-        console.log(
-          `[解冻资源] 订单${order.id} 开始解冻持仓 - 股票: ${order.symbol}, 数量: ${actualUnfilledQuantity}`
-        );
+        // console.log(
+        //   `[解冻资源] 订单${order.id} 开始解冻持仓 - 股票: ${order.symbol}, 数量: ${actualUnfilledQuantity}`
+        // );
 
         // 先查询实际冻结持仓
         const position = await prisma.position.findUnique({
@@ -523,15 +523,15 @@ export class OrderService {
           frozenQtyNum
         );
 
-        console.log(
-          `[解冻资源] 订单${order.id} 实际解冻持仓: ${actualFrozenQuantity}, 当前冻结持仓: ${frozenQtyNum}`
-        );
+        // console.log(
+        //   `[解冻资源] 订单${order.id} 实际解冻持仓: ${actualFrozenQuantity}, 当前冻结持仓: ${frozenQtyNum}`
+        // );
 
         if (actualFrozenQuantity > 0) {
-          const positionBeforeUnfreeze = await prisma.position.findUnique({
-            where: { userId_symbol: { userId, symbol: order.symbol } },
-            select: { quantity: true, frozenQuantity: true },
-          });
+          // const positionBeforeUnfreeze = await prisma.position.findUnique({
+          //   where: { userId_symbol: { userId, symbol: order.symbol } },
+          //   select: { quantity: true, frozenQuantity: true },
+          // });
 
           // 使用统一的持仓解冻方法
           await this.userService.adjustFrozenQuantity(
@@ -541,20 +541,20 @@ export class OrderService {
             prisma
           );
 
-          const positionAfterUnfreeze = await prisma.position.findUnique({
-            where: { userId_symbol: { userId, symbol: order.symbol } },
-            select: { quantity: true, frozenQuantity: true },
-          });
+          // const positionAfterUnfreeze = await prisma.position.findUnique({
+          //   where: { userId_symbol: { userId, symbol: order.symbol } },
+          //   select: { quantity: true, frozenQuantity: true },
+          // });
 
-          console.log(
-            `[解冻资源] 订单${order.id} 持仓解冻完成 - ` +
-              `解冻前: 持仓${positionBeforeUnfreeze?.quantity || 0}, 冻结${
-                positionBeforeUnfreeze?.frozenQuantity || 0
-              }, ` +
-              `解冻后: 持仓${positionAfterUnfreeze?.quantity || 0}, 冻结${
-                positionAfterUnfreeze?.frozenQuantity || 0
-              }`
-          );
+          // console.log(
+          //   `[解冻资源] 订单${order.id} 持仓解冻完成 - ` +
+          //     `解冻前: 持仓${positionBeforeUnfreeze?.quantity || 0}, 冻结${
+          //       positionBeforeUnfreeze?.frozenQuantity || 0
+          //     }, ` +
+          //     `解冻后: 持仓${positionAfterUnfreeze?.quantity || 0}, 冻结${
+          //       positionAfterUnfreeze?.frozenQuantity || 0
+          //     }`
+          // );
         }
       }
     }
@@ -562,7 +562,7 @@ export class OrderService {
 
   /** 取消订单 */
   async cancelOrder(orderId: number, userId: number) {
-    console.log(`[订单取消] 用户${userId} 开始取消订单${orderId}`);
+    // console.log(`[订单取消] 用户${userId} 开始取消订单${orderId}`);
 
     // 查找订单
     const order = await this.prisma.order.findUnique({
@@ -594,23 +594,23 @@ export class OrderService {
       throw new ForbiddenException('无权限取消此订单');
     }
 
-    console.log(
-      `[订单取消] 找到订单${orderId} - ` +
-        `类型: ${order.type}, 股票: ${order.symbol}, ` +
-        `价格: ${order.price.toNumber().toFixed(2)}, 数量: ${
-          order.quantity
-        }, ` +
-        `已成交: ${order.filledQuantity}, 状态: ${order.status}`
-    );
+    // console.log(
+    //   `[订单取消] 找到订单${orderId} - ` +
+    //     `类型: ${order.type}, 股票: ${order.symbol}, ` +
+    //     `价格: ${order.price.toNumber().toFixed(2)}, 数量: ${
+    //       order.quantity
+    //     }, ` +
+    //     `已成交: ${order.filledQuantity}, 状态: ${order.status}`
+    // );
 
     // 如果订单已经是取消或完成状态，直接返回成功
     if (order.status === OrderStatus.CANCELLED) {
-      console.log(`[订单取消] 订单${orderId}已经是取消状态`);
+      // console.log(`[订单取消] 订单${orderId}已经是取消状态`);
       return { success: true, message: '订单已经是取消状态' };
     }
 
     if (order.status === OrderStatus.FILLED) {
-      console.log(`[订单取消] 订单${orderId}已完全成交，无需取消`);
+      // console.log(`[订单取消] 订单${orderId}已完全成交，无需取消`);
       return { success: true, message: '订单已完全成交，无需取消' };
     }
 
@@ -626,10 +626,10 @@ export class OrderService {
     // 计算需要解冻的数量（未成交部分）
     const unfilledQuantity = order.quantity - order.filledQuantity;
 
-    console.log(
-      `[订单取消] 订单${orderId} 准备解冻资源 - ` +
-        `未成交数量: ${unfilledQuantity}, 订单类型: ${order.type}, 方法: ${order.method}`
-    );
+    // console.log(
+    //   `[订单取消] 订单${orderId} 准备解冻资源 - ` +
+    //     `未成交数量: ${unfilledQuantity}, 订单类型: ${order.type}, 方法: ${order.method}`
+    // );
 
     // 在事务中更新订单状态并解冻资金/股票
     await this.prisma.$transaction(async (prisma) => {
@@ -639,7 +639,7 @@ export class OrderService {
         data: { status: OrderStatus.CANCELLED },
       });
 
-      console.log(`[订单取消] 订单${orderId} 状态已更新为CANCELLED`);
+      // console.log(`[订单取消] 订单${orderId} 状态已更新为CANCELLED`);
 
       // 使用提取的解冻函数处理资金或股票解冻
       await this.unfreezeOrderResources(
@@ -650,19 +650,19 @@ export class OrderService {
       );
     });
 
-    console.log(`[订单取消] 订单${orderId} 取消完成`);
+    // console.log(`[订单取消] 订单${orderId} 取消完成`);
     return { success: true };
   }
 
   // 优化的撮合引擎
   private async matchOrder(newOrder: any, prisma: any) {
-    console.log(
-      `[撮合引擎] 开始撮合订单${newOrder.id} - ` +
-        `用户${newOrder.userId}, 类型: ${newOrder.type}, 方法: ${newOrder.method}, ` +
-        `股票: ${newOrder.symbol}, 价格: ${
-          newOrder.price ? newOrder.price.toNumber().toFixed(2) : '市价'
-        }, 数量: ${newOrder.quantity}`
-    );
+    // console.log(
+    //   `[撮合引擎] 开始撮合订单${newOrder.id} - ` +
+    //     `用户${newOrder.userId}, 类型: ${newOrder.type}, 方法: ${newOrder.method}, ` +
+    //     `股票: ${newOrder.symbol}, 价格: ${
+    //       newOrder.price ? newOrder.price.toNumber().toFixed(2) : '市价'
+    //     }, 数量: ${newOrder.quantity}`
+    // );
 
     const oppositeType =
       newOrder.type === OrderType.BUY ? OrderType.SELL : OrderType.BUY;
@@ -714,24 +714,24 @@ export class OrderService {
       orderBy,
     });
 
-    console.log(
-      `[撮合引擎] 订单${newOrder.id} 找到${oppositeOrders.length}个对手盘订单 - ` +
-        `寻找类型: ${oppositeType}, 价格条件: ${JSON.stringify(
-          whereCondition || '无限制'
-        )}, 排序: ${JSON.stringify(orderBy)}`
-    );
+    // console.log(
+    //   `[撮合引擎] 订单${newOrder.id} 找到${oppositeOrders.length}个对手盘订单 - ` +
+    //     `寻找类型: ${oppositeType}, 价格条件: ${JSON.stringify(
+    //       whereCondition || '无限制'
+    //     )}, 排序: ${JSON.stringify(orderBy)}`
+    // );
 
     if (oppositeOrders.length > 0) {
-      console.log(
-        `[撮合引擎] 对手盘订单详情: ${oppositeOrders
-          .map(
-            (o) =>
-              `订单${o.id}(用户${o.userId}, 价格${
-                o.price?.toNumber()?.toFixed(2) || '市价'
-              }, 剩余${o.quantity - o.filledQuantity})`
-          )
-          .join(', ')}`
-      );
+      // console.log(
+      //   `[撮合引擎] 对手盘订单详情: ${oppositeOrders
+      //     .map(
+      //       (o) =>
+      //         `订单${o.id}(用户${o.userId}, 价格${
+      //           o.price?.toNumber()?.toFixed(2) || '市价'
+      //         }, 剩余${o.quantity - o.filledQuantity})`
+      //     )
+      //     .join(', ')}`
+      // );
     }
 
     // 直接执行撮合逻辑
@@ -761,10 +761,10 @@ export class OrderService {
         continue;
       }
 
-      console.log(
-        `[撮合引擎] 尝试撮合 订单${newOrder.id} vs 订单${oppositeOrder.id} - ` +
-          `剩余需求: ${remainingQuantity}, 对手可用: ${availableQuantity}`
-      );
+      // console.log(
+      //   `[撮合引擎] 尝试撮合 订单${newOrder.id} vs 订单${oppositeOrder.id} - ` +
+      //     `剩余需求: ${remainingQuantity}, 对手可用: ${availableQuantity}`
+      // );
 
       // 当前最大可交易量
       let maxTradeQuantity = Math.min(remainingQuantity, availableQuantity);
@@ -798,9 +798,9 @@ export class OrderService {
         continue;
       }
 
-      console.log(
-        `[撮合引擎] 确定交易数量 - 订单${newOrder.id} vs 订单${oppositeOrder.id}, 数量: ${tradeQuantity}`
-      );
+      // console.log(
+      //   `[撮合引擎] 确定交易数量 - 订单${newOrder.id} vs 订单${oppositeOrder.id}, 数量: ${tradeQuantity}`
+      // );
 
       // 正确的成交价格计算：遵循价格优先和时间优先原则
       let tradePrice: number;
@@ -837,16 +837,16 @@ export class OrderService {
       }
       tradePrice = Math.round(tradePrice * 100) / 100; // 保留2位小数
 
-      console.log(
-        `[撮合引擎] 确定成交价格 - 订单${newOrder.id} vs 订单${oppositeOrder.id}, ` +
-          `成交价: ${tradePrice.toFixed(2)}, 成交量: ${tradeQuantity}, ` +
-          `买方: ${
-            newOrder.type === 'BUY' ? newOrder.userId : oppositeOrder.userId
-          }, ` +
-          `卖方: ${
-            newOrder.type === 'SELL' ? newOrder.userId : oppositeOrder.userId
-          }`
-      );
+      // console.log(
+      //   `[撮合引擎] 确定成交价格 - 订单${newOrder.id} vs 订单${oppositeOrder.id}, ` +
+      //     `成交价: ${tradePrice.toFixed(2)}, 成交量: ${tradeQuantity}, ` +
+      //     `买方: ${
+      //       newOrder.type === 'BUY' ? newOrder.userId : oppositeOrder.userId
+      //     }, ` +
+      //     `卖方: ${
+      //       newOrder.type === 'SELL' ? newOrder.userId : oppositeOrder.userId
+      //     }`
+      // );
 
       // 创建交易记录
       const trade = await prisma.trade.create({
@@ -905,11 +905,11 @@ export class OrderService {
         },
       });
 
-      console.log(
-        `[撮合引擎] 更新订单${newOrder.id} - ` +
-          `已成交: ${newOrderFilledQty}/${newOrder.quantity}, 状态: ${newOrderNewStatus}, ` +
-          `平均价格: ${newOrderNewAvgPrice.toFixed(2)}`
-      );
+      // console.log(
+      //   `[撮合引擎] 更新订单${newOrder.id} - ` +
+      //     `已成交: ${newOrderFilledQty}/${newOrder.quantity}, 状态: ${newOrderNewStatus}, ` +
+      //     `平均价格: ${newOrderNewAvgPrice.toFixed(2)}`
+      // );
 
       // 更新累计变量供下一轮撮合使用
       newOrderCumulativeFilledQty = newOrderFilledQty;
@@ -949,22 +949,22 @@ export class OrderService {
         },
       });
 
-      console.log(
-        `[撮合引擎] 更新订单${oppositeOrder.id} - ` +
-          `已成交: ${oppositeOrderFilledQty}/${oppositeOrder.quantity}, 状态: ${oppositeOrderNewStatus}`
-      );
+      // console.log(
+      //   `[撮合引擎] 更新订单${oppositeOrder.id} - ` +
+      //     `已成交: ${oppositeOrderFilledQty}/${oppositeOrder.quantity}, 状态: ${oppositeOrderNewStatus}`
+      // );
 
       // 更新用户余额和持仓（传入事务实例避免嵌套事务）
-      console.log(
-        `[撮合引擎] 开始更新用户余额和持仓 - 交易${trade.id}, ` +
-          `买方订单: ${
-            newOrder.type === 'BUY' ? newOrder.id : oppositeOrder.id
-          }, ` +
-          `卖方订单: ${
-            newOrder.type === 'SELL' ? newOrder.id : oppositeOrder.id
-          }, ` +
-          `价格: ${tradePrice.toFixed(2)}, 数量: ${tradeQuantity}`
-      );
+      // console.log(
+      //   `[撮合引擎] 开始更新用户余额和持仓 - 交易${trade.id}, ` +
+      //     `买方订单: ${
+      //       newOrder.type === 'BUY' ? newOrder.id : oppositeOrder.id
+      //     }, ` +
+      //     `卖方订单: ${
+      //       newOrder.type === 'SELL' ? newOrder.id : oppositeOrder.id
+      //     }, ` +
+      //     `价格: ${tradePrice.toFixed(2)}, 数量: ${tradeQuantity}`
+      // );
 
       await this.updateUserBalances(
         newOrder.type === 'BUY' ? newOrder : oppositeOrder,
@@ -975,15 +975,15 @@ export class OrderService {
         positionChanges
       );
 
-      console.log(`[撮合引擎] 用户余额和持仓更新完成 - 交易${trade.id}`);
+      // console.log(`[撮合引擎] 用户余额和持仓更新完成 - 交易${trade.id}`);
 
       filledQuantity += tradeQuantity;
       remainingQuantity -= tradeQuantity;
 
-      console.log(
-        `[撮合引擎] 订单${newOrder.id} 撮合进度 - ` +
-          `已成交: ${filledQuantity} / ${remainingQuantity}`
-      );
+      // console.log(
+      //   `[撮合引擎] 订单${newOrder.id} 撮合进度 - ` +
+      //     `已成交: ${filledQuantity} / ${remainingQuantity}`
+      // );
     }
 
     // 🔧 市价订单简化逻辑：如果有剩余未成交部分，直接取消而不是设置为部分成交
@@ -997,9 +997,9 @@ export class OrderService {
       } else {
         finalStatus = OrderStatus.CANCELLED;
       }
-      console.log(
-        `[撮合引擎] 市价订单${newOrder.id} 撮合结束，设置状态为${finalStatus}，开始解冻 (剩余数量: ${remainingQuantity})`
-      );
+      // console.log(
+      //   `[撮合引擎] 市价订单${newOrder.id} 撮合结束，设置状态为${finalStatus}，开始解冻 (剩余数量: ${remainingQuantity})`
+      // );
 
       // 使用最新订单数据（包含最新的actualUsedAmount等）以确保解冻金额准确
       const latestOrder = await prisma.order.findUnique({
@@ -1073,12 +1073,12 @@ export class OrderService {
     const symbol = buyOrder.symbol || sellOrder.symbol;
     const db = prisma; // 使用传入的事务实例
 
-    console.log(
-      `[余额更新] 开始处理交易 - 买方: ${buyOrder.userId}, 卖方: ${sellOrder.userId}, ` +
-        `股票: ${symbol}, 价格: ${price.toFixed(
-          2
-        )}, 数量: ${quantity}, 总金额: ${tradeAmount.toFixed(2)}`
-    );
+    // console.log(
+    //   `[余额更新] 开始处理交易 - 买方: ${buyOrder.userId}, 卖方: ${sellOrder.userId}, ` +
+    //     `股票: ${symbol}, 价格: ${price.toFixed(
+    //       2
+    //     )}, 数量: ${quantity}, 总金额: ${tradeAmount.toFixed(2)}`
+    // );
 
     // 获取更新前的用户状态
     const buyerBefore = await db.user.findUnique({
@@ -1086,45 +1086,45 @@ export class OrderService {
       select: { balance: true, frozenBalance: true },
     });
 
-    const sellerBefore = await db.user.findUnique({
-      where: { id: sellOrder.userId },
-      select: { balance: true, frozenBalance: true },
-    });
+    // const sellerBefore = await db.user.findUnique({
+    //   where: { id: sellOrder.userId },
+    //   select: { balance: true, frozenBalance: true },
+    // });
 
     const buyerPositionBefore = await db.position.findUnique({
       where: { userId_symbol: { userId: buyOrder.userId, symbol } },
       select: { quantity: true, frozenQuantity: true, avgPrice: true },
     });
 
-    const sellerPositionBefore = await db.position.findUnique({
-      where: { userId_symbol: { userId: sellOrder.userId, symbol } },
-      select: { quantity: true, frozenQuantity: true, avgPrice: true },
-    });
+    // const sellerPositionBefore = await db.position.findUnique({
+    //   where: { userId_symbol: { userId: sellOrder.userId, symbol } },
+    //   select: { quantity: true, frozenQuantity: true, avgPrice: true },
+    // });
 
-    console.log(
-      `[余额更新] 更新前状态 - ` +
-        `买方${buyOrder.userId}: 余额${
-          buyerBefore?.balance?.toNumber()?.toFixed(2) || '0'
-        }, ` +
-        `冻结${buyerBefore?.frozenBalance?.toNumber()?.toFixed(2) || '0'}, ` +
-        `持仓${buyerPositionBefore?.quantity || 0}, 冻结持仓${
-          buyerPositionBefore?.frozenQuantity || 0
-        }; ` +
-        `卖方${sellOrder.userId}: 余额${
-          sellerBefore?.balance?.toNumber()?.toFixed(2) || '0'
-        }, ` +
-        `冻结${sellerBefore?.frozenBalance?.toNumber()?.toFixed(2) || '0'}, ` +
-        `持仓${sellerPositionBefore?.quantity || 0}, 冻结持仓${
-          sellerPositionBefore?.frozenQuantity || 0
-        }`
-    );
+    // console.log(
+    //   `[余额更新] 更新前状态 - ` +
+    //     `买方${buyOrder.userId}: 余额${
+    //       buyerBefore?.balance?.toNumber()?.toFixed(2) || '0'
+    //     }, ` +
+    //     `冻结${buyerBefore?.frozenBalance?.toNumber()?.toFixed(2) || '0'}, ` +
+    //     `持仓${buyerPositionBefore?.quantity || 0}, 冻结持仓${
+    //       buyerPositionBefore?.frozenQuantity || 0
+    //     }; ` +
+    //     `卖方${sellOrder.userId}: 余额${
+    //       sellerBefore?.balance?.toNumber()?.toFixed(2) || '0'
+    //     }, ` +
+    //     `冻结${sellerBefore?.frozenBalance?.toNumber()?.toFixed(2) || '0'}, ` +
+    //     `持仓${sellerPositionBefore?.quantity || 0}, 冻结持仓${
+    //       sellerPositionBefore?.frozenQuantity || 0
+    //     }`
+    // );
 
     // 买方：从冻结资金扣减，增加持仓
-    console.log(
-      `[余额更新] 买方${buyOrder.userId} 从冻结资金扣减 ${tradeAmount.toFixed(
-        2
-      )}`
-    );
+    // console.log(
+    //   `[余额更新] 买方${buyOrder.userId} 从冻结资金扣减 ${tradeAmount.toFixed(
+    //     2
+    //   )}`
+    // );
 
     // 🔧 修复市价买单撮合时的冻结资金扣减逻辑
     // 交易资金应该在订单创建时全部冻结，如果冻结余额不足说明系统存在数据一致性问题
@@ -1187,11 +1187,11 @@ export class OrderService {
     }
 
     // 从冻结资金扣减交易金额
-    console.log(
-      `[余额更新] 买方${buyOrder.userId} 从冻结余额扣减 ${tradeAmount.toFixed(
-        2
-      )}`
-    );
+    // console.log(
+    //   `[余额更新] 买方${buyOrder.userId} 从冻结余额扣减 ${tradeAmount.toFixed(
+    //     2
+    //   )}`
+    // );
     // 从买家冻结金额中付款
     await this.userService.payBalance(buyOrder.userId, tradeAmount, db);
 
@@ -1240,15 +1240,15 @@ export class OrderService {
             }
 
             if (unfreezeDec.greaterThan(0)) {
-              console.log(
-                `[买单资金解冻-完全成交] 用户${
-                  buyOrder.userId
-                } 解冻差额资金: ${unfreezeDec.toFixed(
-                  2
-                )} (冻结: ${frozenAmountDec.toFixed(
-                  2
-                )}, 已用: ${actualUsedDec.toFixed(2)})`
-              );
+              // console.log(
+              //   `[买单资金解冻-完全成交] 用户${
+              //     buyOrder.userId
+              //   } 解冻差额资金: ${unfreezeDec.toFixed(
+              //     2
+              //   )} (冻结: ${frozenAmountDec.toFixed(
+              //     2
+              //   )}, 已用: ${actualUsedDec.toFixed(2)})`
+              // );
               await this.userService.unfreezeBalance(
                 buyOrder.userId,
                 unfreezeDec.toNumber(),
@@ -1261,9 +1261,9 @@ export class OrderService {
     }
 
     // 卖方：从冻结持仓转为实际扣减，增加资金
-    console.log(
-      `[余额更新] 卖方${sellOrder.userId} 从冻结持仓扣减 ${quantity} 股 ${symbol}`
-    );
+    // console.log(
+    //   `[余额更新] 卖方${sellOrder.userId} 从冻结持仓扣减 ${quantity} 股 ${symbol}`
+    // );
     await this.userService.deductFromFrozenPosition(
       sellOrder.userId,
       symbol,
@@ -1272,9 +1272,9 @@ export class OrderService {
     );
 
     // 卖方：增加资金
-    console.log(
-      `[余额更新] 卖方${sellOrder.userId} 增加余额 ${tradeAmount.toFixed(2)}`
-    );
+    // console.log(
+    //   `[余额更新] 卖方${sellOrder.userId} 增加余额 ${tradeAmount.toFixed(2)}`
+    // );
     await db.user.update({
       where: { id: sellOrder.userId },
       data: {
@@ -1285,9 +1285,9 @@ export class OrderService {
     });
 
     // 买方：增加持仓
-    console.log(
-      `[余额更新] 买方${buyOrder.userId} 增加持仓 ${quantity} 股 ${symbol}`
-    );
+    // console.log(
+    //   `[余额更新] 买方${buyOrder.userId} 增加持仓 ${quantity} 股 ${symbol}`
+    // );
 
     // 更新持仓
     await this.updatePositionInTransaction(
@@ -1306,15 +1306,15 @@ export class OrderService {
       positionChanges.set(sellOrder.userId, currentSellerChange - quantity);
       positionChanges.set(buyOrder.userId, currentBuyerChange + quantity);
 
-      console.log(
-        `[余额更新] 持仓变化跟踪 - ` +
-          `卖方${sellOrder.userId}: ${currentSellerChange} -> ${
-            currentSellerChange - quantity
-          }, ` +
-          `买方${buyOrder.userId}: ${currentBuyerChange} -> ${
-            currentBuyerChange + quantity
-          }`
-      );
+      // console.log(
+      //   `[余额更新] 持仓变化跟踪 - ` +
+      //     `卖方${sellOrder.userId}: ${currentSellerChange} -> ${
+      //       currentSellerChange - quantity
+      //     }, ` +
+      //     `买方${buyOrder.userId}: ${currentBuyerChange} -> ${
+      //       currentBuyerChange + quantity
+      //     }`
+      // );
     }
 
     // 获取更新后的用户状态
@@ -1338,23 +1338,23 @@ export class OrderService {
       select: { quantity: true, frozenQuantity: true, avgPrice: true },
     });
 
-    console.log(
-      `[余额更新] 更新后状态 - ` +
-        `买方${buyOrder.userId}: 余额${
-          buyerAfter?.balance?.toNumber()?.toFixed(2) || '0'
-        }, ` +
-        `冻结${buyerAfter?.frozenBalance?.toNumber()?.toFixed(2) || '0'}, ` +
-        `持仓${buyerPositionAfter?.quantity || 0}, 冻结持仓${
-          buyerPositionAfter?.frozenQuantity || 0
-        }; ` +
-        `卖方${sellOrder.userId}: 余额${
-          sellerAfter?.balance?.toNumber()?.toFixed(2) || '0'
-        }, ` +
-        `冻结${sellerAfter?.frozenBalance?.toNumber()?.toFixed(2) || '0'}, ` +
-        `持仓${sellerPositionAfter?.quantity || 0}, 冻结持仓${
-          sellerPositionAfter?.frozenQuantity || 0
-        }`
-    );
+    // console.log(
+    //   `[余额更新] 更新后状态 - ` +
+    //     `买方${buyOrder.userId}: 余额${
+    //       buyerAfter?.balance?.toNumber()?.toFixed(2) || '0'
+    //     }, ` +
+    //     `冻结${buyerAfter?.frozenBalance?.toNumber()?.toFixed(2) || '0'}, ` +
+    //     `持仓${buyerPositionAfter?.quantity || 0}, 冻结持仓${
+    //       buyerPositionAfter?.frozenQuantity || 0
+    //     }; ` +
+    //     `卖方${sellOrder.userId}: 余额${
+    //       sellerAfter?.balance?.toNumber()?.toFixed(2) || '0'
+    //     }, ` +
+    //     `冻结${sellerAfter?.frozenBalance?.toNumber()?.toFixed(2) || '0'}, ` +
+    //     `持仓${sellerPositionAfter?.quantity || 0}, 冻结持仓${
+    //       sellerPositionAfter?.frozenQuantity || 0
+    //     }`
+    // );
 
     // 🚨 交易撮合完成后检查买卖双方是否出现负数
     const buyerBalanceOk = await this.negativeDetectionService.checkUserBalance(
@@ -1398,9 +1398,9 @@ export class OrderService {
       throw new Error('交易撮合完成后检测到负数，事务将回滚');
     }
 
-    console.log(
-      `[余额更新] 交易处理完成 - 买方: ${buyOrder.userId}, 卖方: ${sellOrder.userId}`
-    );
+    // console.log(
+    //   `[余额更新] 交易处理完成 - 买方: ${buyOrder.userId}, 卖方: ${sellOrder.userId}`
+    // );
   }
 
   /** 广播市场数据更新 */
@@ -1509,10 +1509,10 @@ export class OrderService {
     quantity: number,
     price: number
   ) {
-    console.log(
-      `[持仓更新] 开始更新持仓 - 用户${userId}, 股票${symbol}, ` +
-        `操作类型: ${orderType}, 数量: ${quantity}, 价格: ${price.toFixed(2)}`
-    );
+    // console.log(
+    //   `[持仓更新] 开始更新持仓 - 用户${userId}, 股票${symbol}, ` +
+    //     `操作类型: ${orderType}, 数量: ${quantity}, 价格: ${price.toFixed(2)}`
+    // );
 
     const existingPosition = await db.position.findUnique({
       where: {
@@ -1523,18 +1523,18 @@ export class OrderService {
       },
     });
 
-    console.log(
-      `[持仓更新] 更新前持仓状态 - 用户${userId}, 股票${symbol}: ` +
-        `${
-          existingPosition
-            ? `数量${
-                existingPosition.quantity
-              }, 平均价格${existingPosition.avgPrice
-                .toNumber()
-                .toFixed(2)}, 冻结${existingPosition.frozenQuantity || 0}`
-            : '无持仓'
-        }`
-    );
+    // console.log(
+    //   `[持仓更新] 更新前持仓状态 - 用户${userId}, 股票${symbol}: ` +
+    //     `${
+    //       existingPosition
+    //         ? `数量${
+    //             existingPosition.quantity
+    //           }, 平均价格${existingPosition.avgPrice
+    //             .toNumber()
+    //             .toFixed(2)}, 冻结${existingPosition.frozenQuantity || 0}`
+    //         : '无持仓'
+    //     }`
+    // );
 
     if (orderType === OrderType.BUY) {
       if (existingPosition) {
@@ -1545,14 +1545,14 @@ export class OrderService {
         const totalQuantity = existingPosition.quantity + quantity;
         const newAvgPrice = totalCost / totalQuantity;
 
-        console.log(
-          `[持仓更新] 买入操作 - 用户${userId}, 股票${symbol}: ` +
-            `原持仓${existingPosition.quantity}@${existingPosition.avgPrice
-              .toNumber()
-              .toFixed(2)}, ` +
-            `新增${quantity}@${price.toFixed(2)}, ` +
-            `更新后${totalQuantity}@${newAvgPrice.toFixed(2)}`
-        );
+        // console.log(
+        //   `[持仓更新] 买入操作 - 用户${userId}, 股票${symbol}: ` +
+        //     `原持仓${existingPosition.quantity}@${existingPosition.avgPrice
+        //       .toNumber()
+        //       .toFixed(2)}, ` +
+        //     `新增${quantity}@${price.toFixed(2)}, ` +
+        //     `更新后${totalQuantity}@${newAvgPrice.toFixed(2)}`
+        // );
 
         const result = await db.position.update({
           where: {
@@ -1567,12 +1567,12 @@ export class OrderService {
           },
         });
 
-        console.log(
-          `[持仓更新] 买入更新完成 - 用户${userId}, 股票${symbol}: ` +
-            `最终持仓${result.quantity}@${result.avgPrice
-              .toNumber()
-              .toFixed(2)}`
-        );
+        // console.log(
+        //   `[持仓更新] 买入更新完成 - 用户${userId}, 股票${symbol}: ` +
+        //     `最终持仓${result.quantity}@${result.avgPrice
+        //       .toNumber()
+        //       .toFixed(2)}`
+        // );
 
         // 🚨 持仓更新后检查是否出现负数
         const positionOk =
@@ -1589,10 +1589,10 @@ export class OrderService {
 
         return result;
       } else {
-        console.log(
-          `[持仓更新] 创建新持仓 - 用户${userId}, 股票${symbol}: ` +
-            `数量${quantity}@${price.toFixed(2)}`
-        );
+        // console.log(
+        //   `[持仓更新] 创建新持仓 - 用户${userId}, 股票${symbol}: ` +
+        //     `数量${quantity}@${price.toFixed(2)}`
+        // );
 
         // 创建新持仓
         const result = await db.position.upsert({
@@ -1614,10 +1614,10 @@ export class OrderService {
           },
         });
 
-        console.log(
-          `[持仓更新] 新持仓创建完成 - 用户${userId}, 股票${symbol}: ` +
-            `持仓${result.quantity}@${result.avgPrice.toNumber().toFixed(2)}`
-        );
+        // console.log(
+        //   `[持仓更新] 新持仓创建完成 - 用户${userId}, 股票${symbol}: ` +
+        //     `持仓${result.quantity}@${result.avgPrice.toNumber().toFixed(2)}`
+        // );
 
         // 🚨 新持仓创建后检查是否出现负数
         const positionOk =
@@ -1642,11 +1642,11 @@ export class OrderService {
           existingPosition.frozenQuantity // 应该从冻结持仓中扣减
         );
 
-        console.log(
-          `[持仓更新] 卖出操作 - 用户${userId}, 股票${symbol}: ` +
-            `原持仓${existingPosition.quantity}, 冻结${existingPosition.frozenQuantity}, ` +
-            `卖出${quantity}, 实际卖出${actualSellQuantity}`
-        );
+        // console.log(
+        //   `[持仓更新] 卖出操作 - 用户${userId}, 股票${symbol}: ` +
+        //     `原持仓${existingPosition.quantity}, 冻结${existingPosition.frozenQuantity}, ` +
+        //     `卖出${quantity}, 实际卖出${actualSellQuantity}`
+        // );
 
         if (actualSellQuantity > 0) {
           // 使用UserService的sellPosition方法处理卖出操作
@@ -1753,11 +1753,11 @@ export class OrderService {
           );
         }
 
-        console.log(
-          `[市价买单] 用户${userId} 冻结全部可用资金: ${availableBalance.toFixed(
-            2
-          )}`
-        );
+        // console.log(
+        //   `[市价买单] 用户${userId} 冻结全部可用资金: ${availableBalance.toFixed(
+        //     2
+        //   )}`
+        // );
 
         return availableBalance;
       } else {
@@ -1779,11 +1779,11 @@ export class OrderService {
   ): Promise<void> {
     if (type === OrderType.BUY) {
       // 买单：验证余额
-      console.log(
-        `[订单创建] 用户${userId} 验证余额 - 需要金额: ${requiredAmount!.toFixed(
-          2
-        )} (${method === OrderMethod.MARKET ? '全部可用资金' : '实际'})`
-      );
+      // console.log(
+      //   `[订单创建] 用户${userId} 验证余额 - 需要金额: ${requiredAmount!.toFixed(
+      //     2
+      //   )} (${method === OrderMethod.MARKET ? '全部可用资金' : '实际'})`
+      // );
 
       // 使用统一的可用余额计算方法
       const availableBalance = await this.userService.getAvailableBalance(
@@ -1804,16 +1804,16 @@ export class OrderService {
         );
       }
 
-      console.log(
-        `[订单创建] 用户${userId} 余额验证通过 - 需要金额: ${requiredAmount!.toFixed(
-          2
-        )}`
-      );
+      // console.log(
+      //   `[订单创建] 用户${userId} 余额验证通过 - 需要金额: ${requiredAmount!.toFixed(
+      //     2
+      //   )}`
+      // );
     } else {
       // 卖单：验证持仓
-      console.log(
-        `[订单创建] 用户${userId} 验证持仓 - 股票: ${symbol}, 数量: ${quantity}`
-      );
+      // console.log(
+      //   `[订单创建] 用户${userId} 验证持仓 - 股票: ${symbol}, 数量: ${quantity}`
+      // );
 
       const hasEnoughPosition = await this.positionService.checkSellQuantity(
         userId,
@@ -1824,9 +1824,9 @@ export class OrderService {
         throw new BadRequestException('持仓不足');
       }
 
-      console.log(
-        `[订单创建] 用户${userId} 持仓验证通过 - 股票: ${symbol}, 数量: ${quantity}`
-      );
+      // console.log(
+      //   `[订单创建] 用户${userId} 持仓验证通过 - 股票: ${symbol}, 数量: ${quantity}`
+      // );
     }
   }
 }

@@ -40,9 +40,8 @@ export default function MarketDataComponent({ marketData, lastTrade, isConnected
               <div className="text-3xl font-bold text-gray-900">
                 ${marketData.price.toFixed(2)}
               </div>
-              <div className={`text-sm font-medium ${
-                marketData.change >= 0 ? 'text-green-600' : 'text-red-600'
-              }`}>
+              <div className={`text-sm font-medium ${marketData.change >= 0 ? 'text-green-600' : 'text-red-600'
+                }`}>
                 {marketData.change >= 0 ? '+' : ''}{marketData.change.toFixed(2)}
                 ({marketData.changePercent >= 0 ? '+' : ''}{(marketData.changePercent * 100).toFixed(2)}%)
               </div>
@@ -71,16 +70,14 @@ export default function MarketDataComponent({ marketData, lastTrade, isConnected
           <div className="mt-4 p-4 bg-blue-50 rounded-lg">
             <div className="flex items-center justify-between">
               <span className="text-sm text-blue-600">连接状态</span>
-              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                isConnected
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${isConnected
                   ? 'bg-green-100 text-green-800'
                   : 'bg-red-100 text-red-800'
-              }`}>
-                <span className={`w-2 h-2 rounded-full mr-1 ${
-                  isConnected
+                }`}>
+                <span className={`w-2 h-2 rounded-full mr-1 ${isConnected
                     ? 'bg-green-400 animate-pulse'
                     : 'bg-red-400'
-                }`}></span>
+                  }`}></span>
                 {isConnected ? 'WebSocket已连接' : 'WebSocket断开'}
               </span>
             </div>

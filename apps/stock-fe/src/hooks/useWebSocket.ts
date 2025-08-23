@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useMarketData } from './useApiQueries';
+import type { PriceUpdateEvent } from '../types/klineTypes';
 
 interface MarketData {
   symbol: string;
@@ -42,12 +43,11 @@ export const useWebSocket = () => {
   // WebSocket连接的独立effect
   useEffect(() => {
     // 连接到WebSocket服务器
-    const socket = io(
-      `${process.env.NEXT_PUBLIC_WS_URL}/market`,
-      {
-        withCredentials: true,
-      }
-    );
+    const socket = io(`${process.env.NEXT_PUBLIC_WS_URL}/market`, {
+      withCredentials: true,
+      // 显式指定 Socket.IO 路径，避免在 Next.js 下被 /api 前缀影响
+      path: '/socket.io',
+    });
 
     socketRef.current = socket;
 
@@ -72,6 +72,32 @@ export const useWebSocket = () => {
     socket.on('tradeCompleted', (data: TradeData) => {
       // console.log('Trade completed:', data);
       setLastTrade(data);
+    });
+
+    // 监听价格更新事件，增强 MarketData 的实时性
+    socket.on('priceUpdate', (update: PriceUpdateEvent) => {
+      setMarketData((prev) => {
+        if (!prev || update.symbol !== prev.symbol) return prev;
+
+        const newPrice = update.price;
+        const open = prev.open;
+        const high = Math.max(prev.high, newPrice);
+        const low = Math.min(prev.low, newPrice);
+        const change = newPrice - open;
+        const changePercent = open ? change / open : 0;
+        const volume = (prev.volume ?? 0) + update.volume;
+
+        return {
+          ...prev,
+          price: newPrice,
+          high,
+          low,
+          change,
+          changePercent,
+          volume,
+          timestamp: new Date(update.timestamp),
+        };
+      });
     });
 
     // 错误处理

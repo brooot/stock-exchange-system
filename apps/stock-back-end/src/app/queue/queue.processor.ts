@@ -4,7 +4,7 @@ import { Job } from 'bull';
 import { OrderService } from '../order/order.service';
 import { MarketGateway } from '../websocket/market.gateway';
 import { KlineService } from '../kline/kline.service';
-import { OrderQueueData, BatchTradeProcessingData } from './queue.service';
+import { OrderQueueData, BatchTradeProcessingData, QueueService } from './queue.service';
 
 @Processor('order-processing')
 @Injectable()
@@ -71,7 +71,8 @@ export class TradeProcessor {
 
   constructor(
     private marketGateway: MarketGateway,
-    private klineService: KlineService
+    private klineService: KlineService,
+    private queueService: QueueService
   ) {
     // 每10分钟清理一次缓存，防止内存泄漏
     this.cleanupTimer = setInterval(() => {
@@ -134,14 +135,21 @@ export class TradeProcessor {
         batchSize: trades.length,
       });
 
-      // 广播价格更新事件（使用最后一个交易的价格）
-      this.marketGateway.broadcastPriceUpdate({
+      // 改为入队价格更新事件（使用最后一个交易的价格）
+      await this.queueService.addMarketDataUpdate(
         symbol,
-        price: lastTrade.price,
-        volume: totalVolume,
-        timestamp: new Date(timestamp),
-        tradeId: lastTrade.id,
-      });
+        'price',
+        {
+          symbol,
+          price: lastTrade.price,
+          volume: totalVolume,
+          timestamp: new Date(timestamp),
+          tradeId: lastTrade.id,
+        }
+      );
+
+      // 追加一条市场汇总更新任务（由服务端查询聚合后广播）
+      await this.queueService.addMarketDataUpdate(symbol, 'market', {});
 
       this.logger.debug(`Batch trade for ${symbol} processed successfully`);
     } catch (error) {
@@ -159,6 +167,15 @@ export class MarketDataProcessor {
   // 防止重复处理的缓存
   private processedUpdates = new Map<string, number>();
   private cleanupTimer: NodeJS.Timeout;
+  // 新增：尾沿合并（trailing debounce）所需的定时器与最后一次载荷
+  private debounceTimers = new Map<string, NodeJS.Timeout>();
+  private lastPayloads = new Map<string, { symbol: string; updateType: 'price' | 'market'; data: any }>();
+  // 新增：最大等待时间（maxWait）定时器，防止持续高频事件导致一直不触发广播
+  private maxWaitTimers = new Map<string, NodeJS.Timeout>();
+
+  private static readonly UPDATE_DEBOUNCE_MS = 50;
+  // 新增：最大等待时间上限（方案A）
+  private static readonly MAX_WAIT_MS = 500;
 
   constructor(
     private marketGateway: MarketGateway,
@@ -174,6 +191,17 @@ export class MarketDataProcessor {
     if (this.cleanupTimer) {
       clearInterval(this.cleanupTimer);
     }
+    // 清理所有定时器
+    for (const timer of this.debounceTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.debounceTimers.clear();
+    // 清理maxWait定时器
+    for (const timer of this.maxWaitTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.maxWaitTimers.clear();
+    this.lastPayloads.clear();
   }
 
   private cleanupCache() {
@@ -194,49 +222,92 @@ export class MarketDataProcessor {
 
   @Process('update-market-data')
   async updateMarketData(
-    job: Job<{ symbol: string; updateType: string; data: any }>
+    job: Job<{ symbol: string; updateType: 'price' | 'market'; data: any }>
   ) {
     const { symbol, updateType, data } = job.data;
 
     try {
-      // 生成更新唯一标识符，避免重复处理
+      // 生成更新唯一标识符（按 symbol + updateType）
       const updateKey = `${symbol}_${updateType}`;
       const currentTime = Date.now();
 
-      // 检查是否在短时间内已经处理过相同的更新
-      const lastProcessed = this.processedUpdates.get(updateKey);
-      if (lastProcessed && currentTime - lastProcessed < 50) {
-        // 50ms 内的重复更新忽略
-        // this.logger.debug(`Market data update ${updateKey} already processed recently, skipping`);
-        return;
-      }
-
-      // 记录处理时间
+      // 记录处理时间（用于监控）
       this.processedUpdates.set(updateKey, currentTime);
 
-      // 清理过期的记录（保留最近5分钟）
-      const fiveMinutesAgo = currentTime - 5 * 60 * 1000;
-      for (const [key, timestamp] of this.processedUpdates.entries()) {
-        if (timestamp < fiveMinutesAgo) {
-          this.processedUpdates.delete(key);
-        }
+      // 尾沿合并：记录最后一次载荷，并在窗口结束时发射
+      this.lastPayloads.set(updateKey, { symbol, updateType, data });
+
+      const existingTimer = this.debounceTimers.get(updateKey);
+      if (existingTimer) {
+        clearTimeout(existingTimer);
       }
 
-      // this.logger.debug(`Updating market data for ${symbol}: ${updateType}`);
+      // 短窗口尾沿防抖计时器
+      const timer = setTimeout(async () => {
+        try {
+          const payload = this.lastPayloads.get(updateKey);
+          if (!payload) return;
 
-      switch (updateType) {
-        case 'price':
-          this.marketGateway.broadcastPriceUpdate(data);
-          break;
-        case 'orderbook':
-          this.marketGateway.broadcastMarketUpdate(data);
-          break;
-        case 'market':
-          // 调用OrderService的broadcastMarketDataUpdate方法
-          await this.orderService.broadcastMarketDataUpdate(symbol);
-          break;
-        default:
-          this.logger.warn(`Unknown market data update type: ${updateType}`);
+          switch (payload.updateType) {
+            case 'price':
+              this.marketGateway.broadcastPriceUpdate(payload.data);
+              break;
+            case 'market':
+              // 调用OrderService的broadcastMarketDataUpdate方法
+              await this.orderService.broadcastMarketDataUpdate(payload.symbol);
+              break;
+            default:
+              // 不会到达：联合类型已限制
+              break;
+          }
+        } catch (err) {
+          this.logger.error(`Debounced emit failed for ${updateKey}:`, err);
+        } finally {
+          // 触发一次广播后，清理两个计时器与缓存
+          const maxWaitTimer = this.maxWaitTimers.get(updateKey);
+          if (maxWaitTimer) {
+            clearTimeout(maxWaitTimer);
+            this.maxWaitTimers.delete(updateKey);
+          }
+          this.debounceTimers.delete(updateKey);
+          this.lastPayloads.delete(updateKey);
+        }
+      }, MarketDataProcessor.UPDATE_DEBOUNCE_MS);
+
+      this.debounceTimers.set(updateKey, timer);
+
+      // 最大等待时间计时器（只在未启动时设置，避免被持续事件不断推迟）
+      if (!this.maxWaitTimers.get(updateKey)) {
+        const maxTimer = setTimeout(async () => {
+          try {
+            const payload = this.lastPayloads.get(updateKey);
+            if (!payload) return;
+
+            switch (payload.updateType) {
+              case 'price':
+                this.marketGateway.broadcastPriceUpdate(payload.data);
+                break;
+              case 'market':
+                await this.orderService.broadcastMarketDataUpdate(payload.symbol);
+                break;
+              default:
+                break;
+            }
+          } catch (err) {
+            this.logger.error(`MaxWait emit failed for ${updateKey}:`, err);
+          } finally {
+            // 强制触发后，同样清理短窗口计时器与缓存，防止重复触发
+            const debounce = this.debounceTimers.get(updateKey);
+            if (debounce) {
+              clearTimeout(debounce);
+              this.debounceTimers.delete(updateKey);
+            }
+            this.maxWaitTimers.delete(updateKey);
+            this.lastPayloads.delete(updateKey);
+          }
+        }, MarketDataProcessor.MAX_WAIT_MS);
+
+        this.maxWaitTimers.set(updateKey, maxTimer);
       }
     } catch (error) {
       this.logger.error(`Failed to update market data for ${symbol}:`, error);

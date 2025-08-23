@@ -3,7 +3,11 @@
  */
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
-import type { KlineData, KlineUpdateEvent, PriceUpdateEvent } from '../types/klineTypes';
+import type {
+  KlineData,
+  KlineUpdateEvent,
+  PriceUpdateEvent,
+} from '../types/klineTypes';
 import { getIntervalInMs } from '../utils/klineUtils';
 
 interface UseKlineWebSocketProps {
@@ -17,17 +21,17 @@ export const useKlineWebSocket = ({
   symbol,
   currentInterval,
   onKlineUpdate,
-  onPriceUpdate
+  onPriceUpdate,
 }: UseKlineWebSocketProps) => {
   const [isConnected, setIsConnected] = useState(false);
   const socketRef = useRef<Socket | null>(null);
   const updateThrottleRef = useRef<NodeJS.Timeout | null>(null);
   const pendingUpdatesRef = useRef<Map<string, KlineData>>(new Map());
-  
+
   // 使用ref保存最新的symbol和currentInterval值，避免WebSocket重新连接
   const symbolRef = useRef(symbol);
   const currentIntervalRef = useRef(currentInterval);
-  
+
   // 更新ref值
   useEffect(() => {
     symbolRef.current = symbol;
@@ -71,27 +75,30 @@ export const useKlineWebSocket = ({
   );
 
   // 处理价格更新事件（用于实时价格显示）
-  const handlePriceUpdate = useCallback((priceUpdate: PriceUpdateEvent) => {
-    const { symbol: updateSymbol } = priceUpdate;
+  const handlePriceUpdate = useCallback(
+    (priceUpdate: PriceUpdateEvent) => {
+      const { symbol: updateSymbol } = priceUpdate;
 
-    // 通过ref获取最新的symbol值
-    const currentSymbol = symbolRef.current;
+      // 通过ref获取最新的symbol值
+      const currentSymbol = symbolRef.current;
 
-    // 只处理当前股票的价格更新
-    if (updateSymbol !== currentSymbol) return;
+      // 只处理当前股票的价格更新
+      if (updateSymbol !== currentSymbol) return;
 
-    // 调用外部传入的价格更新处理函数
-    onPriceUpdate?.(priceUpdate);
-  }, [onPriceUpdate]);
+      // 调用外部传入的价格更新处理函数
+      onPriceUpdate?.(priceUpdate);
+    },
+    [onPriceUpdate]
+  );
 
   // 初始化WebSocket连接
   useEffect(() => {
-    const socket = io(
-      `${process.env.NEXT_PUBLIC_API_URL}/market`,
-      {
-        withCredentials: true,
-      }
-    );
+    // 与 useWebSocket 保持一致，统一使用 NEXT_PUBLIC_WS_URL 作为 Socket 连接基地址
+    const socket = io(`${process.env.NEXT_PUBLIC_WS_URL}/market`, {
+      withCredentials: true,
+      // 显式指定 Socket.IO 路径，避免因 API 前缀导致握手路径变为 /api/socket.io/
+      path: '/socket.io',
+    });
 
     socketRef.current = socket;
 
@@ -127,6 +134,6 @@ export const useKlineWebSocket = ({
 
   return {
     isConnected,
-    socket: socketRef.current
+    socket: socketRef.current,
   };
 };
