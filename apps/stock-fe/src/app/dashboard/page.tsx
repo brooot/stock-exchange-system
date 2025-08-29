@@ -14,21 +14,9 @@ interface Position {
   unrealizedPnL?: number;
 }
 
-interface MarketData {
-  symbol: string;
-  price: number;
-  change: number;
-  changePercent: number;
-  volume: number;
-  high: number;
-  low: number;
-  open: number;
-}
-
-
-
 export default function DashboardPage() {
-  const { marketData, lastTrade, isConnected } = useWebSocket();
+  // 初始化 WebSocket 连接与实时数据写入 store
+  useWebSocket();
 
   const { data: accountResponse } = useAccountInfo();
   const { data: positionsResponse } = useUserPositions();
@@ -56,8 +44,6 @@ export default function DashboardPage() {
     calculatePortfolioValue();
   }, [positions]);
 
-
-
   // 计算投资组合总价值
   const calculatePortfolioValue = () => {
     if (!positions.length) {
@@ -77,11 +63,10 @@ export default function DashboardPage() {
     setPortfolioValue(totalValue.toNumber());
   };
 
-
   // 稳定KLineChart的props
   const klineChartProps = useMemo(() => ({
-    symbol: "AAPL" as const,
-    initialInterval: "1m" as const
+    symbol: 'AAPL' as const,
+    initialInterval: '1m' as const
   }), []);
 
   // 稳定TradingPanel的onCreateOrder回调
@@ -98,9 +83,6 @@ export default function DashboardPage() {
     }
   }, [createOrderMutation]);
 
-
-
-
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
@@ -112,15 +94,10 @@ export default function DashboardPage() {
 
           <PositionTable
             positions={positions}
-            marketData={marketData}
           />
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <MarketData
-              marketData={marketData}
-              isConnected={isConnected}
-              lastTrade={lastTrade}
-            />
+            <MarketData />
 
             <BotControl />
           </div>
@@ -131,7 +108,6 @@ export default function DashboardPage() {
           />
 
           <TradingPanel
-            marketData={marketData}
             onCreateOrder={handleCreateOrder}
             isLoading={createOrderMutation.isPending}
             error={error}

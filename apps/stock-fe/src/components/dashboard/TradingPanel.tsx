@@ -1,20 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-
-interface MarketData {
-  symbol: string;
-  price: number;
-  change: number;
-  changePercent: number;
-  volume: number;
-  high: number;
-  low: number;
-  open: number;
-}
+import { useMarketStore } from '../../stores/marketStore';
 
 interface TradingPanelProps {
-  marketData: MarketData | null;
   onCreateOrder: (orderData: {
     symbol: string;
     type: 'BUY' | 'SELL';
@@ -28,12 +17,12 @@ interface TradingPanelProps {
 }
 
 export default function TradingPanel({
-  marketData,
   onCreateOrder,
   isLoading,
   error,
   success
 }: TradingPanelProps) {
+  const marketData = useMarketStore((s) => s.marketData);
   const [orderType, setOrderType] = useState<'BUY' | 'SELL'>('BUY');
   const [orderMethod, setOrderMethod] = useState<'MARKET' | 'LIMIT'>('LIMIT');
   const [quantity, setQuantity] = useState('');

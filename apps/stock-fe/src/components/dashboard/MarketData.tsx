@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useMarketStore } from '../../stores/marketStore';
 
 interface MarketData {
   symbol: string;
@@ -19,13 +20,11 @@ interface LastTrade {
   batchSize?: number;
 }
 
-interface MarketDataProps {
-  marketData: MarketData | null;
-  lastTrade: LastTrade | null;
-  isConnected: boolean;
-}
+export default function MarketDataComponent() {
+  const marketData = useMarketStore((s) => s.marketData);
+  const lastTrade = useMarketStore((s) => s.lastTrade);
+  const isConnected = useMarketStore((s) => s.isConnected);
 
-export default function MarketDataComponent({ marketData, lastTrade, isConnected }: MarketDataProps) {
   return (
     <div className="bg-white rounded-lg shadow p-6">
       <h2 className="text-lg font-medium text-gray-900 mb-4">市场行情</h2>
@@ -40,8 +39,7 @@ export default function MarketDataComponent({ marketData, lastTrade, isConnected
               <div className="text-3xl font-bold text-gray-900">
                 ${marketData.price.toFixed(2)}
               </div>
-              <div className={`text-sm font-medium ${marketData.change >= 0 ? 'text-green-600' : 'text-red-600'
-                }`}>
+              <div className={`text-sm font-medium ${marketData.change >= 0 ? 'text-green-600' : 'text-red-600'}` }>
                 {marketData.change >= 0 ? '+' : ''}{marketData.change.toFixed(2)}
                 ({marketData.changePercent >= 0 ? '+' : ''}{(marketData.changePercent * 100).toFixed(2)}%)
               </div>

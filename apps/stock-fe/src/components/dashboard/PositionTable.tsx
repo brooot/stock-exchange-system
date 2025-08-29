@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useMarketStore } from '../../stores/marketStore';
 
 interface Position {
   id: string;
@@ -11,23 +12,9 @@ interface Position {
   unrealizedPnL?: number;
 }
 
-interface MarketData {
-  symbol: string;
-  price: number;
-  change: number;
-  changePercent: number;
-  volume: number;
-  high: number;
-  low: number;
-  open: number;
-}
+export default function PositionTable({ positions }: { positions: Position[] }) {
+  const marketData = useMarketStore((s) => s.marketData);
 
-interface PositionTableProps {
-  positions: Position[];
-  marketData: MarketData | null;
-}
-
-export default function PositionTable({ positions, marketData }: PositionTableProps) {
   return (
     <div className="bg-white rounded-lg shadow p-6">
       <h2 className="text-lg font-medium text-gray-900 mb-4">持仓信息</h2>
@@ -58,7 +45,7 @@ export default function PositionTable({ positions, marketData }: PositionTablePr
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {positions.map((position) => {
-                const currentPrice = marketData?.price || position.avgPrice;
+                const currentPrice = marketData?.price ?? position.avgPrice;
                 const currentValue = position.quantity * currentPrice;
                 const unrealizedPnL = position.quantity * (currentPrice - position.avgPrice);
                 const pnlPercent = ((currentPrice - position.avgPrice) / position.avgPrice) * 100;
