@@ -26,24 +26,12 @@ echo ""
 
 # 步骤2: 注册第一个用户 (brot)
 echo "[步骤 2/3] 注册第一个用户 (brot)..."
-echo "发送注册请求到: https://www.brooot.top/api/auth/register"
+echo "发送注册请求到: http://localhost/api/auth/register"
 
 RESPONSE1=$(curl -s -w "\n%{http_code}" \
-  'https://www.brooot.top/api/auth/register' \
+  'http://localhost:3001/api/auth/register' \
   -H 'Accept: application/json, text/plain, */*' \
-  -H 'Accept-Language: zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6' \
-  -H 'Connection: keep-alive' \
   -H 'Content-Type: application/json' \
-  -b '__next_hmr_refresh_hash__=3db6d7df68679fe9e32dbfce5987ac36633457081244afec' \
-  -H 'Origin: https://www.brooot.top:3000' \
-  -H 'Referer: https://www.brooot.top:3000/' \
-  -H 'Sec-Fetch-Dest: empty' \
-  -H 'Sec-Fetch-Mode: cors' \
-  -H 'Sec-Fetch-Site: same-site' \
-  -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36 Edg/139.0.0.0' \
-  -H 'sec-ch-ua: "Not;A=Brand";v="99", "Microsoft Edge";v="139", "Chromium";v="139"' \
-  -H 'sec-ch-ua-mobile: ?0' \
-  -H 'sec-ch-ua-platform: "macOS"' \
   --data-raw '{"username":"brot","password":"112233"}')
 
 # 分离响应体和状态码
@@ -69,24 +57,12 @@ echo ""
 
 # 步骤3: 注册第二个用户 (exchanger)
 echo "[步骤 3/3] 注册第二个用户 (exchanger)..."
-echo "发送注册请求到: https://www.brooot.top/api/auth/register"
+echo "发送注册请求到: http://localhost/api/auth/register"
 
 RESPONSE2=$(curl -s -w "\n%{http_code}" \
-  'https://www.brooot.top/api/auth/register' \
+  'http://localhost:3001/api/auth/register' \
   -H 'Accept: application/json, text/plain, */*' \
-  -H 'Accept-Language: zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6' \
-  -H 'Connection: keep-alive' \
   -H 'Content-Type: application/json' \
-  -b '__next_hmr_refresh_hash__=3db6d7df68679fe9e32dbfce5987ac36633457081244afec' \
-  -H 'Origin: https://www.brooot.top:3000' \
-  -H 'Referer: https://www.brooot.top:3000/' \
-  -H 'Sec-Fetch-Dest: empty' \
-  -H 'Sec-Fetch-Mode: cors' \
-  -H 'Sec-Fetch-Site: same-site' \
-  -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36 Edg/139.0.0.0' \
-  -H 'sec-ch-ua: "Not;A=Brand";v="99", "Microsoft Edge";v="139", "Chromium";v="139"' \
-  -H 'sec-ch-ua-mobile: ?0' \
-  -H 'sec-ch-ua-platform: "macOS"' \
   --data-raw '{"username":"exchanger","password":"112233"}')
 
 # 分离响应体和状态码

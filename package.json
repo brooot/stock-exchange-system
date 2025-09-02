@@ -5,7 +5,7 @@
   "scripts": {
     "dev:all": "./dev.sh --logs --build --clean & pnpm run dev:fe",
     "dev:be": "./dev.sh --logs",
-    "dev:fe": "cd apps/stock-fe && pnpx next dev --turbo --experimental-https --experimental-https-key ../../certs/www.brooot.top.key --experimental-https-cert ../../certs/www.brooot.top.pem"
+    "dev:fe": "cd apps/stock-fe && pnpx next dev --turbo"
   },
   "private": true,
   "dependencies": {
