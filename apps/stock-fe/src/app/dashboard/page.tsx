@@ -5,6 +5,7 @@ import Decimal from 'decimal.js';
 import { useAccountInfo, useUserPositions, useCreateOrder } from '../../hooks/useApiQueries';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { AccountInfo, PositionTable, MarketData, TradingPanel, BotControl, KLineChart } from '../../components/dashboard';
+import { ChatWidget } from '../../components/chat-widget';
 
 interface Position {
   symbol: string;
@@ -68,7 +69,6 @@ export default function DashboardPage() {
     symbol: 'AAPL' as const,
     initialInterval: '1m' as const
   }), []);
-
   // 稳定TradingPanel的onCreateOrder回调
   const handleCreateOrder = useCallback(async (orderData: any) => {
     setError('');
@@ -115,6 +115,7 @@ export default function DashboardPage() {
           />
         </div>
       </div>
+      <ChatWidget />
     </div>
   );
 }

@@ -411,3 +411,21 @@ summary svg {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* ==== Override ChatUI global scroll lock to restore page scroll ==== */
+html, body {
+  height: auto !important;
+  overflow-y: auto !important;
+  overscroll-behavior-y: auto;
+}
+:root, html, body {
+  overflow-x: hidden;
+}
+/* Ensure root can grow and scroll in Next.js app router */
+#\__next, body {
+  min-height: 100%;
+}
+/* Avoid any global fixed layout on body/html coming from third-party CSS */
+html, body {
+  position: static !important;
+}

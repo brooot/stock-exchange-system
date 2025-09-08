@@ -15,6 +15,7 @@ import { KlineModule } from './kline/kline.module';
 // import { RedisModule } from './redis/redis.module';
 import { QueueModule } from './queue/queue.module';
 import { NegativeDetectionService } from './common/negative-detection.service';
+import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { NegativeDetectionService } from './common/negative-detection.service';
     WebsocketModule,
     BotModule,
     KlineModule,
+    AiModule,
   ],
   controllers: [AppController],
   providers: [

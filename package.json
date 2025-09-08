@@ -3,13 +3,20 @@
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
-    "dev:all": "./dev.sh --logs --build --clean & pnpm run dev:fe",
+    "dev:all": "./dev.sh --logs --build --clean & nx serve stock-fe",
     "dev:be": "./dev.sh --logs",
-    "dev:fe": "cd apps/stock-fe && pnpx next dev --turbo"
+    "dev:fe": "nx serve stock-fe"
   },
   "private": true,
   "dependencies": {
     "@ant-design/icons": "^6.0.0",
+    "@chatui/core": "^3.1.0",
+    "@langchain/community": "^0.3.54",
+    "@langchain/core": "^0.3.73",
+    "@langchain/langgraph": "^0.4.9",
+    "@langchain/langgraph-checkpoint": "^0.1.1",
+    "@langchain/ollama": "^0.2.4",
+    "@langchain/openai": "^0.6.11",
     "@nestjs/bull": "^11.0.3",
     "@nestjs/common": "^11.0.0",
     "@nestjs/config": "^4.0.2",
@@ -34,6 +41,8 @@
     "echarts": "^5.6.0",
     "express": "^5.1.0",
     "ioredis": "^5.7.0",
+    "langsmith": "^0.3.66",
+    "marked": "^16.2.1",
     "next": "~15.4.3",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
@@ -47,6 +56,7 @@
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
     "tslib": "^2.3.0",
+    "zod": "^4.1.5",
     "zustand": "^5.0.8"
   },
   "devDependencies": {
@@ -103,5 +113,10 @@
     "webpack-cli": "^5.1.4",
     "webpack-node-externals": "^3.0.0"
   },
-  "packageManager": "pnpm@10.14.0"
+  "packageManager": "pnpm@10.14.0",
+  "pnpm": {
+    "overrides": {
+      "@langchain/core": "0.3.73"
+    }
+  }
 }
