@@ -1,7 +1,5 @@
 import {
   Controller,
-  Post,
-  Body,
   UseGuards,
   Request,
   Sse,
@@ -17,25 +15,26 @@ import { Observable, fromEventPattern, map } from 'rxjs';
 export class AiController {
   constructor(private readonly aiService: AiService) {}
 
-  @Post('chat')
-  async chat(
-    @Body() body: { message: string; sessionId?: string },
-    @Request() req
-  ) {
-    const userId = req.user.userId as number;
-    const { message, sessionId } = body;
-    return this.aiService.chat({ userId, message, sessionId });
-  }
-
   @Sse('chat/stream')
   stream(
-    @Query('message') message: string,
-    @Query('sessionId') sessionId: string,
+    @Query('payload') payload: string | undefined,
     @Request() req
   ): Observable<MessageEvent> {
     const userId = req.user.userId as number;
 
-    const emitter = this.aiService.chatStream({ userId, message, sessionId });
+    let parsedPayload = {};
+    if (payload) {
+      try {
+        parsedPayload = JSON.parse(payload);
+      } catch {
+        // ignore invalid JSON and fall back to query params
+      }
+    }
+
+    const emitter = this.aiService.chatStream({
+      userId,
+      ...parsedPayload,
+    });
 
     return fromEventPattern<MessageEvent>(
       (handler) => emitter.on('message', handler),

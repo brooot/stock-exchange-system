@@ -95,7 +95,9 @@ export class TradeService {
       select: { price: true },
     });
 
-    return latestOrder && latestOrder.price !== null ? latestOrder.price.toNumber() : 150.0; // 默认价格
+    return latestOrder && latestOrder.price !== null
+      ? latestOrder.price.toNumber()
+      : 150.0; // 默认价格
   }
 
   // 获取市场数据
@@ -120,7 +122,7 @@ export class TradeService {
     }
 
     // 计算市场数据，过滤掉价格为 null 的交易记录
-    const validTrades = recentTrades.filter(trade => trade.price !== null);
+    const validTrades = recentTrades.filter((trade) => trade.price !== null);
     if (validTrades.length === 0) {
       // 如果没有有效的交易记录，返回默认数据
       return {
@@ -134,7 +136,7 @@ export class TradeService {
         open: 150.0,
       };
     }
-    
+
     const prices = validTrades.map((trade) =>
       parseFloat(trade.price.toString())
     );

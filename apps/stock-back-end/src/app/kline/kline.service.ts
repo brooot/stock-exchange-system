@@ -102,27 +102,27 @@ export class KlineService implements OnModuleDestroy {
       const symbols = await this.getAvailableSymbols();
 
       if (symbols.length === 0) {
-        console.log('没有找到股票数据，使用默认AAPL进行初始化');
+        // console.log('没有找到股票数据，使用默认AAPL进行初始化');
         await this.initializeSymbolCache('AAPL');
         return;
       }
 
-      console.log(`开始初始化K线缓存，股票数量: ${symbols.length}`);
+      // console.log(`开始初始化K线缓存，股票数量: ${symbols.length}`);
 
       // 并行初始化所有股票的缓存以提高性能
       await Promise.all(
         symbols.map((symbol) => this.initializeSymbolCache(symbol))
       );
 
-      console.log('K线缓存初始化完成');
+      // console.log('K线缓存初始化完成');
     } catch (error) {
-      console.error('K线缓存初始化失败:', error);
+      // console.error('K线缓存初始化失败:', error);
       // 失败时至少初始化AAPL
       try {
         await this.initializeSymbolCache('AAPL');
-        console.log('已回退到AAPL缓存初始化');
+        // console.log('已回退到AAPL缓存初始化');
       } catch (fallbackError) {
-        console.error('AAPL缓存初始化也失败:', fallbackError);
+        // console.error('AAPL缓存初始化也失败:', fallbackError);
       }
     }
   }
@@ -210,9 +210,9 @@ export class KlineService implements OnModuleDestroy {
         }
       }
 
-      console.log(`${symbol} K线缓存初始化完成`);
+      // console.log(`${symbol} K线缓存初始化完成`);
     } catch (error) {
-      console.error(`${symbol} K线缓存初始化失败:`, error);
+      // console.error(`${symbol} K线缓存初始化失败:`, error);
     }
   }
 
@@ -380,14 +380,14 @@ export class KlineService implements OnModuleDestroy {
         create: klineData,
       });
 
-      console.log(
-        `保存1分钟K线: ${symbol} ${new Date(timestamp).toISOString()}`
-      );
+      // console.log(
+      //   `保存1分钟K线: ${symbol} ${new Date(timestamp).toISOString()}`
+      // );
 
       // 触发高级周期聚合
       await this.aggregateHigherIntervals(symbol, timestamp);
     } catch (error) {
-      console.error('保存基础K线失败:', error);
+      // console.error('保存基础K线失败:', error);
     }
   }
 
@@ -494,11 +494,11 @@ export class KlineService implements OnModuleDestroy {
 
       this.updateCacheAndBroadcast(symbol, klineData, interval);
 
-      console.log(
-        `生成聚合K线: ${symbol} ${interval} ${startTime.toISOString()}`
-      );
+      // console.log(
+      //   `生成聚合K线: ${symbol} ${interval} ${startTime.toISOString()}`
+      // );
     } catch (error) {
-      console.error(`生成聚合K线失败 ${interval}:`, error);
+      // console.error(`生成聚合K线失败 ${interval}:`, error);
     }
   }
 
@@ -593,17 +593,17 @@ export class KlineService implements OnModuleDestroy {
 
     // 如果缓存中的数据不足，尝试从数据库补充
     if (klineData.length < Math.min(limit, 50)) {
-      console.log(
-        `缓存数据不足 (${klineData.length}/${limit})，从数据库补充 ${symbol} ${interval} 数据`
-      );
+      // console.log(
+      //   `缓存数据不足 (${klineData.length}/${limit})，从数据库补充 ${symbol} ${interval} 数据`
+      // );
       await this.loadDataFromDatabase(symbol, interval, limit);
       klineData = this.klineCache.get(cacheKey) || [];
 
       // 如果仍然数据不足且不是1分钟周期，尝试生成聚合数据
       if (klineData.length < Math.min(limit, 30) && interval !== '1m') {
-        console.log(
-          `聚合数据不足，尝试生成缺失的 ${symbol} ${interval} 聚合数据`
-        );
+        // console.log(
+        //   `聚合数据不足，尝试生成缺失的 ${symbol} ${interval} 聚合数据`
+        // );
         await this.generateMissingAggregatedData(symbol, interval, limit);
         klineData = this.klineCache.get(cacheKey) || [];
       }
@@ -611,9 +611,9 @@ export class KlineService implements OnModuleDestroy {
 
     // 返回最近的limit条数据
     const result = klineData.slice(-limit);
-    console.log(
-      `返回K线数据: ${symbol} ${interval}, 请求${limit}条, 实际返回${result.length}条`
-    );
+    // console.log(
+    //   `返回K线数据: ${symbol} ${interval}, 请求${limit}条, 实际返回${result.length}条`
+    // );
     return result;
   }
 
@@ -817,18 +817,18 @@ export class KlineService implements OnModuleDestroy {
    */
   private async fillMissingKlineData() {
     try {
-      console.log('开始检查并填充缺失的K线数据...');
+      // console.log('开始检查并填充缺失的K线数据...');
       const symbols = await this.getAvailableSymbols();
-      console.log(`找到 ${symbols.length} 个股票代码需要检查:`, symbols);
+      // console.log(`找到 ${symbols.length} 个股票代码需要检查:`, symbols);
       const now = Date.now();
       const currentMinute = Math.floor(now / (60 * 1000)) * (60 * 1000);
 
       for (const symbol of symbols) {
         await this.fillMissingKlineForSymbol(symbol, currentMinute);
       }
-      console.log('K线数据补全检查完成');
+      // console.log('K线数据补全检查完成');
     } catch (error) {
-      console.error('补全缺失K线数据失败:', error);
+      // console.error('补全缺失K线数据失败:', error);
     }
   }
 
@@ -892,9 +892,9 @@ export class KlineService implements OnModuleDestroy {
         return;
       }
 
-      console.log(
-        `发现 ${symbol} 缺失 ${missingTimestamps.length} 分钟的K线数据，开始补全...`
-      );
+      // console.log(
+      //   `发现 ${symbol} 缺失 ${missingTimestamps.length} 分钟的K线数据，开始补全...`
+      // );
 
       // 用最后已知价格补全缺失的数据
       const lastPrice = lastKline.close.toNumber();
@@ -958,9 +958,9 @@ export class KlineService implements OnModuleDestroy {
         }
       }
 
-      console.log(
-        `完成补全 ${symbol} 的 ${missingTimestamps.length} 分钟K线数据`
-      );
+      // console.log(
+      //   `完成补全 ${symbol} 的 ${missingTimestamps.length} 分钟K线数据`
+      // );
 
       // 触发高级周期的聚合更新
       for (const timestamp of missingTimestamps) {
@@ -975,7 +975,7 @@ export class KlineService implements OnModuleDestroy {
    * 清理过期的K线数据
    */
   private cleanupExpiredData() {
-    console.log('开始清理过期的K线缓存数据...');
+    // console.log('开始清理过期的K线缓存数据...');
     const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
 
     for (const [key, klineData] of this.klineCache.entries()) {
@@ -986,21 +986,21 @@ export class KlineService implements OnModuleDestroy {
 
       if (firstValidIndex > 0) {
         klineData.splice(0, firstValidIndex);
-        console.log(
-          `清理了 ${key} 的缓存，从 ${originalSize} 条减少到 ${klineData.length} 条`
-        );
+        // console.log(
+        //   `清理了 ${key} 的缓存，从 ${originalSize} 条减少到 ${klineData.length} 条`
+        // );
       } else if (firstValidIndex === -1 && originalSize > 0) {
         this.klineCache.set(key, []);
-        console.log(
-          `清理了 ${key} 的缓存，所有 ${originalSize} 条数据均已过期`
-        );
+        // console.log(
+        //   `清理了 ${key} 的缓存，所有 ${originalSize} 条数据均已过期`
+        // );
       }
     }
-    console.log('过期的K线缓存数据清理完成。');
+    // console.log('过期的K线缓存数据清理完成。');
   }
 
   onModuleDestroy() {
-    console.log('KlineService 销毁，清理定时器...');
+    // console.log('KlineService 销毁，清理定时器...');
 
     // 清理定期任务定时器
     if (this.periodicTaskTimer) {
@@ -1021,6 +1021,6 @@ export class KlineService implements OnModuleDestroy {
     // 清理缓存数据
     this.processedKlineData.clear();
 
-    console.log('KlineService 清理完成。');
+    // console.log('KlineService 清理完成。');
   }
 }

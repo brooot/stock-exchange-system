@@ -4,17 +4,17 @@ export const ASSISTANT_CFG = {
   },
 };
 
-const ASSISTANT_NAME = '龙哥的小跟班鸡宝';
+const ASSISTANT_NAME = 'brooot';
 
 export const CHAT_WIDGET_INITIAL_MESSAGES = [
   {
     type: 'system',
-    content: { text: `专属智能客服 ${ASSISTANT_NAME} 为您服务` },
+    content: { text: `专属智能助理 ${ASSISTANT_NAME} 为您服务` },
   },
   {
     type: 'text',
     content: {
-      text: `Hi，俺是你的专属智能助理 ${ASSISTANT_NAME}，有问题请随时找俺哦~`,
+      text: `Hi，我是你的专属智能助理 ${ASSISTANT_NAME}，有问题请随时找我哦~`,
     },
     ...ASSISTANT_CFG,
   },

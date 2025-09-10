@@ -1,51 +1,26 @@
-/* eslint-disable @typescript-eslint/no-unused-expressions */
 import { Injectable } from '@nestjs/common';
 import { EventEmitter } from 'events';
 import { OrderService } from '../order/order.service';
 import { ChatOpenAI } from '@langchain/openai';
-import { ChatOllama } from '@langchain/ollama';
 import { createReactAgent } from '@langchain/langgraph/prebuilt';
 import { tool } from '@langchain/core/tools';
-import { isAIMessageChunk } from '@langchain/core/messages';
+import { BaseMessageLike, isAIMessageChunk } from '@langchain/core/messages';
 import { MemorySaver } from '@langchain/langgraph-checkpoint';
 
-import {
-  HumanMessage,
-  SystemMessage,
-  AIMessageChunk,
-} from '@langchain/core/messages';
-import { Annotation, Messages } from '@langchain/langgraph';
-import { traceable } from 'langsmith/traceable';
-import { JsonOutputParser } from '@langchain/core/output_parsers';
-import { ChatPromptTemplate } from '@langchain/core/prompts';
-import { z } from 'zod';
-import { Intent, IntentType } from './nodes/intent';
-import { MAX_TOKENS, SYSTEM_PROMPT } from './consts';
+import { HumanMessage, SystemMessage } from '@langchain/core/messages';
+import { Command } from '@langchain/langgraph';
+import { CustomGraphState, MAX_TOKENS, SYSTEM_PROMPT } from './consts';
 import { createGetStockPrice } from './tools/price-check';
 import { TradeService } from '../trade/trade.service';
+import { UserService } from '../user/user.service';
+import { createGetOrderInfo } from './tools/order-tools';
 
 export interface ChatRequest {
   userId: number;
-  message: string;
+  message?: string;
   sessionId?: string;
+  resume?: any;
 }
-
-// LangGraph 状态定义
-const ConversationState = Annotation.Root({
-  userId: Annotation<number>,
-  sessionId: Annotation<string>,
-  userMessage: Annotation<string>,
-  intent: Annotation<{
-    type: IntentType;
-    confidence: number;
-    entities?: Record<string, any>;
-  } | null>,
-  orders: Annotation<any[] | null>,
-  llmResponse: Annotation<string | null>,
-  finalResponse: Annotation<string | null>,
-  isStreaming: Annotation<boolean>,
-  streamChunks: Annotation<string[]>,
-});
 
 @Injectable()
 export class AiService {
@@ -55,7 +30,8 @@ export class AiService {
 
   constructor(
     private readonly orderService: OrderService,
-    private readonly tradeService: TradeService
+    private readonly tradeService: TradeService,
+    private readonly userService: UserService
   ) {
     this.llm = new ChatOpenAI({
       apiKey: this.getApiKey(),
@@ -67,29 +43,30 @@ export class AiService {
       maxTokens: MAX_TOKENS,
     });
 
-    this.tools = [createGetStockPrice(this.tradeService)];
-    // 自定义LLM调用逻辑：确保系统提示只出现一次
-    // const customModel = {
-    //   ...this.llm,
-    //   async invoke(inputMessages, options) {
-    //     // 过滤掉输入中可能存在的重复系统提示
-    //     const userMessages = inputMessages.filter(
-    //       (msg) => msg.role !== 'system' // 保留非系统提示的消息（用户/助手/工具消息）
-    //     );
+    this.tools = [
+      createGetStockPrice(this.tradeService),
+      createGetOrderInfo(this.orderService),
+    ];
 
-    //     // 构建最终输入：[唯一系统提示] + [用户/助手/工具消息]
-    //     const finalMessages = [systemPrompt, ...userMessages];
+    const prompt = (
+      state: typeof CustomGraphState.State
+    ): BaseMessageLike[] => {
+      const userName = state.userName;
+      return [
+        new SystemMessage(
+          `用户名称是${userName}；用户ID是${state.userId}。${SYSTEM_PROMPT}`
+        ),
+        ...state.messages,
+      ];
+    };
 
-    //     // 调用原始模型
-    //     return await model.invoke(finalMessages, options);
-    //   },
-    // };
     // 构建 Agent with tools
     this.agent = createReactAgent({
       llm: this.llm, // 大模型实例
       tools: this.tools, // 提供工具调用能力
       checkpointer: new MemorySaver(), // 提供短期会话持久化能力
-      prompt: new SystemMessage(SYSTEM_PROMPT), // ! TODO 在这里添加，避免重复添加系统提示词
+      prompt, // ! TODO 在这里添加，避免重复添加系统提示词
+      stateSchema: CustomGraphState,
     });
   }
 
@@ -99,23 +76,54 @@ export class AiService {
     return key;
   }
 
-  async chat(req: ChatRequest) {
-    const traceableChat = traceable(
-      async (request: ChatRequest) => {
-        const result = await this.agent.invoke({
-          userId: request.userId,
-          sessionId: request.sessionId,
-          userMessage: request.message,
-          isStreaming: false,
-          streamChunks: [],
-        });
-
-        return result.finalResponse;
-      },
-      { name: 'ai_chat', run_type: 'llm' }
-    );
-
-    return await traceableChat(req);
+  async handleStreamOutput(stream: any, emitter: EventEmitter) {
+    let hasContent = false;
+    // eslint-disable-next-line
+    // @ts-ignore
+    for await (const [streamMode, chunk] of stream) {
+      if (streamMode === 'messages') {
+        const [message, _metadata] = chunk;
+        if (
+          isAIMessageChunk(message) &&
+          !message.tool_call_chunks?.length &&
+          message.content
+        ) {
+          hasContent = true;
+          emitter.emit(
+            'message',
+            JSON.stringify({
+              type: 'text_chunk',
+              data: message.content,
+            })
+          );
+        }
+      } else if (streamMode === 'updates') {
+        console.log('===> current values: ', chunk);
+        if (chunk?.__interrupt__?.length) {
+          console.log('===> values interrupt: ', chunk?.__interrupt__);
+          // hasContent = true;
+          emitter.emit(
+            'message',
+            JSON.stringify({
+              type: 'interrupt',
+              data: chunk?.__interrupt__,
+            })
+          );
+        }
+      }
+      if (!hasContent) {
+        // emitter.emit(
+        //   'message',
+        //   JSON.stringify({
+        //     type: 'error',
+        //     error: '系统繁忙，请稍后再试。',
+        //   })
+        // );
+      }
+    }
+    if (hasContent) {
+      emitter.emit('message', '[DONE]');
+    }
   }
 
   chatStream(req: ChatRequest): EventEmitter {
@@ -124,50 +132,41 @@ export class AiService {
     // 异步执行以避免阻塞
     (async () => {
       try {
-        const inputs = {
-          messages: [
-            // new SystemMessage(SYSTEM_PROMPT),
-            new HumanMessage(req.message),
-          ],
-        };
-        const stream = await this.agent.stream(inputs, {
-          streamMode: 'messages',
-          configurable: {
+        let inputs;
+        if (req.resume !== undefined) {
+          inputs = new Command({ resume: req.resume });
+        } else {
+          const userName = await this.userService.getUserName(req.userId);
+          inputs = {
+            messages: [new HumanMessage(req.message)],
+            // 提供信息给系统提示词消费
+            userName,
             userId: req.userId,
+            sessionId: req.sessionId,
+          };
+        }
+        const stream = await this.agent.stream(inputs, {
+          streamMode: ['messages', 'updates'],
+          configurable: {
             thread_id: req.sessionId,
           },
         });
-        // eslint-disable-next-line
-        // @ts-ignore
-        for await (const [message, _metadata] of stream) {
-          if (isAIMessageChunk(message) && message.tool_call_chunks?.length) {
-            console.log(
-              `${message.getType()} MESSAGE TOOL CALL CHUNK: ${
-                message.tool_call_chunks[0].args
-              }`
-            );
-          } else {
-            message.content &&
-              console.log(
-                `${message.getType()} MESSAGE CONTENT: ${message.content}`
-              );
-          }
-          if (
-            isAIMessageChunk(message) &&
-            !message.tool_call_chunks?.length &&
-            message.content
-          )
-            emitter.emit(
-              'message',
-              JSON.stringify({
-                type: 'text_chunk',
-                data: message.content,
-              })
-            );
-        }
-        emitter.emit('message', '[DONE]');
-        return;
+
+        await this.handleStreamOutput(stream, emitter);
+
+        // const secondStream = await this.agent.stream(
+        //   new Command({ resume: { approved: true } }),
+        //   {
+        //     streamMode: ['messages', 'values'],
+        //     configurable: {
+        //       userId: req.userId,
+        //       thread_id: req.sessionId,
+        //     },
+        //   }
+        // );
+        // await this.handleStreamOutput(secondStream, emitter);
       } catch (e: any) {
+        console.log('===> 出错: ', e);
         emitter.emit(
           'message',
           JSON.stringify({

@@ -1,16 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react';
-import Chat, { Bubble, Typing, TypingBubble, useMessages, type MessageProps } from '@chatui/core';
+import Chat, { Bubble, Button, Flex, Typing, TypingBubble, useMessages, type MessageProps } from '@chatui/core';
 import api from '../../utils/api';
 import { ASSISTANT_CFG, CHAT_WIDGET_INITIAL_MESSAGES } from './consts';
 import * as marked from 'marked';
+import { SendMessageType } from './types';
 
 export default function ChatWidget() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
   const [sessionId] = useState<string>(() => crypto.randomUUID());
+  const [actedMsgIds, setActedMsgIds] = useState<Set<string>>(new Set());
 
   const { messages, appendMsg, updateMsg, resetList } = useMessages(CHAT_WIDGET_INITIAL_MESSAGES);
 
@@ -33,6 +35,20 @@ export default function ChatWidget() {
 
   const toggle = () => setOpen((v) => !v);
 
+  const markActed = (interruptId: string) => {
+    if (!interruptId) return;
+    setActedMsgIds(prev => {
+      const next = new Set(prev);
+      next.add(interruptId);
+      return next;
+    });
+  };
+
+  const sendResumeInfo = (interruptId: string, info: any) => {
+    markActed(interruptId);
+    send(SendMessageType.RESUME, info)
+  }
+
   const renderMessageContent = (msg: MessageProps) => {
     const { type, content } = msg;
 
@@ -49,36 +65,39 @@ export default function ChatWidget() {
       return marked.parse(text) as string;
     }
 
-
-    // 先处理自定义：订单列表（避免被当作文本渲染）
-    if ((content as any)?.__kind === 'orders') {
-      const data = (content as any).data as any[];
-      return (
-        <div className="mt-2 space-y-2 max-h-64 overflow-auto">
-          {data?.length ? (
-            data.map((o) => (
-              <div key={o.id} className="p-2 rounded border bg-white text-sm">
-                <div className="flex justify-between">
-                  <span className="font-medium">{o.symbol}</span>
-                  <span className="text-gray-500">{o.status}</span>
-                </div>
-                <div className="text-gray-600">
-                  {o.type} · {o.method} · 价格: {o.price ?? '-'} · 数量: {o.quantity} · 已成交: {o.filledQuantity}
-                </div>
-                <div className="text-gray-400 text-xs">{new Date(o.createdAt).toLocaleString()}</div>
-              </div>
-            ))
-          ) : (
-            <div className="text-gray-500 text-sm">暂无订单</div>
-          )}
+    if (type === 'interrupt') {
+      const { interruptInfoList } = content;
+      const { value, id: interruptId } = interruptInfoList[0]
+      const { interruptType, desc } = value
+      const isDisabled = interruptId ? actedMsgIds.has(interruptId) : false;
+      console.log('===> interruptType: ', interruptType);
+      if (interruptType === 'permission') {
+        return <div className="prose prose-sm max-w-none">
+          <TypingBubble options={{ step: 3, interval: 30 }} content={desc} isRichText messageRender={renderMarkdown}>
+            <Flex justify='space-around'>
+              <Button color="primary" disabled={isDisabled} onClick={() => {
+                sendResumeInfo(interruptId, { approved: true })
+              }}>同意</Button>
+              <Button disabled={isDisabled} onClick={() => {
+                sendResumeInfo(interruptId, { approved: false })
+              }}>拒绝</Button>
+            </Flex>
+          </TypingBubble>
         </div>
-      );
+      }
+
+      return <Bubble content={desc} />
+
     }
 
     if (type === 'text') {
       const text = String((content as any)?.text ?? '');
       console.log('===> text: ', text);
-      return <TypingBubble options={{ step: 3, interval: 30 }} content={text} isRichText messageRender={renderMarkdown} />
+      return (
+        <div className="prose prose-sm max-w-none">
+          <TypingBubble options={{ step: 3, interval: 30 }} content={text} isRichText messageRender={renderMarkdown} />
+        </div>
+      )
     }
     if (type === 'image') {
       return (
@@ -90,17 +109,26 @@ export default function ChatWidget() {
     return null;
   };
 
-  const send = async (type: string, val: any) => {
-    if (type !== 'text') return;
-    const text = String(val || '').trim();
-    if (!text) return;
+  const send = async (sendMessageType: SendMessageType, val: any) => {
+    if (sendMessageType !== SendMessageType.TEXT && sendMessageType !== SendMessageType.RESUME) return;
+    const text = sendMessageType === SendMessageType.TEXT ? String(val || '').trim() : '';
+    if (sendMessageType === SendMessageType.TEXT && !text) return;
 
-    appendMsg({ type: 'userMsg', content: { text }, position: 'right' });
+    if (sendMessageType === SendMessageType.TEXT) {
+      appendMsg({ type: 'userMsg', content: { text }, position: 'right' });
+    }
 
     try {
       setLoading(true);
       const base = api.defaults.baseURL?.replace(/\/$/, '') || '';
-      const sseUrl = `${base}/ai/chat/stream?message=${encodeURIComponent(text)}&sessionId=${encodeURIComponent(sessionId)}`;
+      let payload: Record<string, any> = sendMessageType === SendMessageType.TEXT
+        ? { message: text, sessionId }
+        : { sessionId, resume: val };
+      payload = {
+        ...payload,
+        type: sendMessageType,
+      }
+      const sseUrl = `${base}/ai/chat/stream?payload=${encodeURIComponent(JSON.stringify(payload))}`;
 
       if (eventSourceRef.current) {
         eventSourceRef.current.close();
@@ -117,7 +145,6 @@ export default function ChatWidget() {
       const es = new EventSource(sseUrl, { withCredentials: true } as any);
       eventSourceRef.current = es;
 
-      // 处理返回的事件数据
       es.onmessage = (ev) => {
         const data = ev.data;
         if (data === '[DONE]') {
@@ -128,49 +155,25 @@ export default function ChatWidget() {
         }
 
         try {
-          // 解析一次
-          let obj: any = JSON.parse(data);
-          // 兼容后端可能包了一层字符串的情况（双重 JSON）
-          if (typeof obj === 'string') {
-            try {
-              obj = JSON.parse(obj);
-            } catch {
-              // 不是 JSON，就当作纯文本
-              obj = { type: 'text_chunk', data: String(obj) };
-            }
-          }
+          const obj: any = JSON.parse(data);
 
-          if (obj?.type === 'orders') {
-            // 替换成自定义订单消息
-            updateAssistMsg(assistantId, {
-              type: 'text',
-              content: { __kind: 'orders', data: obj.data } as any,
-            });
-            return;
-          }
-
-          // 兼容后端的流式分片格式 { type: 'text_chunk', data: string }
           if (obj?.type === 'text_chunk' && typeof obj.data === 'string') {
             assistantText += obj.data;
             updateAssistMsg(assistantId, { type: 'text', content: { text: assistantText } as any });
             return;
           }
 
-          // 兼容 OpenAI/DeepSeek 的 delta 片段
-          const delta = obj?.choices?.[0]?.delta?.content ?? '';
-          if (delta) {
-            assistantText += delta;
-            updateAssistMsg(assistantId, { type: 'text', content: { text: assistantText } as any });
+          if (obj?.type === 'interrupt' && obj.data?.length) {
+            const interruptInfoList = obj.data;
+            updateAssistMsg(assistantId, { type: 'interrupt', content: { interruptInfoList } as any });
             return;
           }
 
-          // 其他可识别的直接文本
           if (typeof obj === 'string') {
             assistantText += obj;
             updateAssistMsg(assistantId, { type: 'text', content: { text: assistantText } as any });
           }
         } catch {
-          // 非 JSON 文本（忽略或直接追加）
           if (typeof data === 'string' && data) {
             assistantText += data;
             updateAssistMsg(assistantId, { type: 'text', content: { text: assistantText } as any });
@@ -181,40 +184,9 @@ export default function ChatWidget() {
       es.onerror = () => {
         es.close();
         eventSourceRef.current = null;
-        fallbackNonStream(text, assistantId, assistantText);
       };
     } catch (e) {
       console.error(e);
-      fallbackNonStream(text);
-    }
-  };
-
-  const fallbackNonStream = async (text: string, assistantId?: string, curText?: string) => {
-    try {
-      const resp = await api.post('/ai/chat', { message: text, sessionId });
-      const payload = resp.data;
-      if (payload?.type === 'orders') {
-        if (assistantId) {
-          updateAssistMsg(assistantId, { type: 'text', content: { __kind: 'orders', data: payload.data } as any });
-        } else {
-          appendAssistMsg({ type: 'text', content: { __kind: 'orders', data: payload.data } as any });
-        }
-      } else {
-        const textOut = payload?.data || '';
-        if (assistantId) {
-          updateAssistMsg(assistantId, { type: 'text', content: { text: (curText || '') + textOut } as any });
-        } else {
-          appendAssistMsg({ type: 'text', content: { text: textOut } as any });
-        }
-      }
-    } catch (err) {
-      if (assistantId) {
-        updateAssistMsg(assistantId, { type: 'text', content: { text: '出错了，请稍后再试。' } as any });
-      } else {
-        appendAssistMsg({ type: 'text', content: { text: '出错了，请稍后再试。' } as any });
-      }
-    } finally {
-      setLoading(false);
     }
   };
 

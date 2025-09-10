@@ -3,10 +3,11 @@ import { AiController } from './ai.controller';
 import { AiService } from './ai.service';
 import { OrderModule } from '../order/order.module';
 import { TradeService } from '../trade/trade.service';
+import { UserService } from '../user/user.service';
 
 @Module({
   imports: [OrderModule],
   controllers: [AiController],
-  providers: [AiService, TradeService],
+  providers: [AiService, TradeService, UserService],
 })
 export class AiModule {}

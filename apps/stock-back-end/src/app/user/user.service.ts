@@ -64,6 +64,17 @@ export class UserService {
     });
   }
 
+  /** 根据用户id获取用户名 */
+  async getUserName(userId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        username: true,
+      },
+    });
+    return user.username;
+  }
+
   async findById(id: number) {
     const user = await this.prisma.user.findUnique({
       where: { id },
@@ -740,7 +751,11 @@ export class UserService {
    * @param tx 可选的事务实例，如果传入则使用该事务，否则使用默认连接
    * @returns 可用持仓数量
    */
-  async getAvailablePosition(userId: number, symbol: string, tx?: any): Promise<number> {
+  async getAvailablePosition(
+    userId: number,
+    symbol: string,
+    tx?: any
+  ): Promise<number> {
     const executeQuery = async (transaction: any) => {
       const position = await transaction.position.findUnique({
         where: {
