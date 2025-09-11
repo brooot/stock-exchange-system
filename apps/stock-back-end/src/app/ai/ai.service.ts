@@ -16,6 +16,7 @@ import { UserService } from '../user/user.service';
 import { createGetOrderInfo } from './tools/order-tools';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { MemoryVectorStore } from 'langchain/vectorstores/memory';
+import { Chroma } from '@langchain/community/vectorstores/chroma';
 import { CheerioWebBaseLoader } from '@langchain/community/document_loaders/web/cheerio';
 // import { ChatAlibabaTongyi } from '@langchain/community/chat_models/alibaba_tongyi';
 import { AlibabaTongyiEmbeddings } from '@langchain/community/embeddings/alibaba_tongyi';
@@ -50,13 +51,50 @@ export class AiService implements OnModuleInit {
     });
     const docSplits = await textSplitter.splitDocuments(docs);
 
-    // Add to vectorDB
-    const vectorStore = await MemoryVectorStore.fromDocuments(
-      docSplits,
-      new AlibabaTongyiEmbeddings({
-        modelName: 'text-embedding-v4',
-      })
-    );
+    const cleanedDocSplits = docSplits.map((doc) => ({
+      ...doc,
+      metadata: {
+        source:
+          typeof doc.metadata.source === 'string'
+            ? doc.metadata.source
+            : 'brooot_profile.pdf',
+        page:
+          typeof doc.metadata.loc?.pageNumber === 'number'
+            ? doc.metadata.loc.pageNumber
+            : 1,
+        chunk_size: doc.pageContent.length,
+      },
+    }));
+
+    const embeddings = new AlibabaTongyiEmbeddings({
+      modelName: 'text-embedding-v4',
+    });
+    const collectionName = process.env.CHROMA_COLLECTION || 'resume_brooot';
+    let vectorStore: any;
+    if (process.env.CHROMA_URL) {
+      try {
+        vectorStore = await Chroma.fromExistingCollection(embeddings, {
+          collectionName,
+          url: process.env.CHROMA_URL,
+        });
+        const count = await vectorStore.collection?.count();
+        if (!count || count === 0) {
+          await vectorStore.addDocuments(cleanedDocSplits);
+        } else {
+          console.log('===> 向量数据库已存在，无需初始化');
+        }
+      } catch (err) {
+        vectorStore = await Chroma.fromDocuments(cleanedDocSplits, embeddings, {
+          collectionName,
+          url: process.env.CHROMA_URL,
+        });
+      }
+    } else {
+      vectorStore = await MemoryVectorStore.fromDocuments(
+        cleanedDocSplits,
+        embeddings
+      );
+    }
 
     const retriever = vectorStore.asRetriever();
     const retrievalTool = createRetrieverTool(retriever, {

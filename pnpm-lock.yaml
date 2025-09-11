@@ -19,7 +19,7 @@ importers:
         version: 3.1.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@langchain/community':
         specifier: ^0.3.54
-        version: 0.3.54(@browserbasehq/sdk@2.6.0(encoding@0.1.13))(@browserbasehq/stagehand@1.14.0(@playwright/test@1.55.0)(deepmerge@4.3.1)(dotenv@16.6.1)(encoding@0.1.13)(openai@5.12.2(ws@8.18.0)(zod@4.1.5))(zod@4.1.5))(@ibm-cloud/watsonx-ai@1.6.12)(@langchain/core@0.3.73(openai@5.12.2(ws@8.18.0)(zod@4.1.5)))(@langchain/ollama@0.2.4(@langchain/core@0.3.73(openai@5.12.2(ws@8.18.0)(zod@4.1.5))))(axios@1.11.0)(encoding@0.1.13)(handlebars@4.7.8)(ibm-cloud-sdk-core@5.4.2)(ignore@5.3.2)(ioredis@5.7.0)(jsdom@20.0.3)(jsonwebtoken@9.0.2)(lodash@4.17.21)(openai@5.12.2(ws@8.18.0)(zod@4.1.5))(pdf-parse@1.1.1)(pg@8.16.3)(playwright@1.55.0)(redis@5.8.1)(weaviate-client@3.8.1(encoding@0.1.13))(ws@8.18.0)
+        version: 0.3.54(@browserbasehq/sdk@2.6.0(encoding@0.1.13))(@browserbasehq/stagehand@1.14.0(@playwright/test@1.55.0)(deepmerge@4.3.1)(dotenv@16.6.1)(encoding@0.1.13)(openai@5.12.2(ws@8.18.0)(zod@4.1.5))(zod@4.1.5))(@ibm-cloud/watsonx-ai@1.6.12)(@langchain/core@0.3.73(openai@5.12.2(ws@8.18.0)(zod@4.1.5)))(@langchain/ollama@0.2.4(@langchain/core@0.3.73(openai@5.12.2(ws@8.18.0)(zod@4.1.5))))(axios@1.11.0)(chromadb@3.0.14)(encoding@0.1.13)(handlebars@4.7.8)(ibm-cloud-sdk-core@5.4.2)(ignore@5.3.2)(ioredis@5.7.0)(jsdom@20.0.3)(jsonwebtoken@9.0.2)(lodash@4.17.21)(openai@5.12.2(ws@8.18.0)(zod@4.1.5))(pdf-parse@1.1.1)(pg@8.16.3)(playwright@1.55.0)(redis@5.8.1)(weaviate-client@3.8.1(encoding@0.1.13))(ws@8.18.0)
       '@langchain/core':
         specifier: 0.3.73
         version: 0.3.73(openai@5.12.2(ws@8.18.0)(zod@4.1.5))
@@ -89,6 +89,9 @@ importers:
       bull:
         specifier: ^4.16.5
         version: 4.16.5
+      chromadb:
+        specifier: ^3.0.14
+        version: 3.0.14
       class-transformer:
         specifier: ^0.5.1
         version: 0.5.1
@@ -4451,6 +4454,43 @@ packages:
   chokidar@4.0.3:
     resolution: {integrity: sha512-Qgzu8kfBvo+cA4962jnP1KkS6Dop5NS6g7R5LFYJr4b8Ub94PPQXUksCw9PvXoeXPRRddRNC5C1JQUR2SMGtnA==}
     engines: {node: '>= 14.16.0'}
+
+  chromadb-js-bindings-darwin-arm64@1.0.5:
+    resolution: {integrity: sha512-uPZa/pDzj5Qcc+r9Nd0pU31UEO7vhe9jOg3mL7LhAG2zBlLOpIofQS4deYy6q4ruQS4FGtL2DQDI7Q3RDE/1pg==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [darwin]
+
+  chromadb-js-bindings-darwin-x64@1.0.5:
+    resolution: {integrity: sha512-E6nfKsJRFB1weEbmjg+kXbEE51fD4IvPVlrjXuPY+82E5Zns2uJmEqlwzc8IztQ6wRfUn2xF/RADfVw3vR/Asw==}
+    engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [darwin]
+
+  chromadb-js-bindings-linux-arm64-gnu@1.0.5:
+    resolution: {integrity: sha512-HYzMxU2uGk4h47EP6nlscDRabQ1mwAuRC+JNsMm7fwqHs7VH7L7sGa1fQR4ydUCPjT9cl0y8eUWQfPz7GAw+HA==}
+    engines: {node: '>= 10'}
+    cpu: [arm64]
+    os: [linux]
+    libc: [glibc]
+
+  chromadb-js-bindings-linux-x64-gnu@1.0.5:
+    resolution: {integrity: sha512-bIigJ+gyNZz8p3wr/zcJZTlKL7p2TVEyT7EfW9lWpdvkajPke8Q+b87aDJaPs6NuGxLcXxPHMRpS3zHWplZbdw==}
+    engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [linux]
+    libc: [glibc]
+
+  chromadb-js-bindings-win32-x64-msvc@1.0.5:
+    resolution: {integrity: sha512-3HJxXw5GmuDqLNjc1cd9/cwqRq3eqaAuPvv+xvBt5/rtq9mPAaXchcKkGJfYQh+fmq46X2r5fM8civpoBQF1sw==}
+    engines: {node: '>= 10'}
+    cpu: [x64]
+    os: [win32]
+
+  chromadb@3.0.14:
+    resolution: {integrity: sha512-szeY35U+Yf9O6hiK7Jw5Vyea6SIPJa4HoyBnywkjY//iIb+hkLgrneef8JClfoQC2MJkZu6SbMPVN7lR2LnhVQ==}
+    engines: {node: '>=20'}
+    hasBin: true
 
   chrome-trace-event@1.0.4:
     resolution: {integrity: sha512-rNjApaLzuwaOTjCiT8lSDdGN1APCiqkChLMJxJPWLunPAt5fy8xgU9/jNOchV84wfIxrA0lRQB7oCT8jrn/wrQ==}
@@ -11173,7 +11213,7 @@ snapshots:
       '@jsonjoy.com/codegen': 1.0.0(tslib@2.8.1)
       tslib: 2.8.1
 
-  '@langchain/community@0.3.54(@browserbasehq/sdk@2.6.0(encoding@0.1.13))(@browserbasehq/stagehand@1.14.0(@playwright/test@1.55.0)(deepmerge@4.3.1)(dotenv@16.6.1)(encoding@0.1.13)(openai@5.12.2(ws@8.18.0)(zod@4.1.5))(zod@4.1.5))(@ibm-cloud/watsonx-ai@1.6.12)(@langchain/core@0.3.73(openai@5.12.2(ws@8.18.0)(zod@4.1.5)))(@langchain/ollama@0.2.4(@langchain/core@0.3.73(openai@5.12.2(ws@8.18.0)(zod@4.1.5))))(axios@1.11.0)(encoding@0.1.13)(handlebars@4.7.8)(ibm-cloud-sdk-core@5.4.2)(ignore@5.3.2)(ioredis@5.7.0)(jsdom@20.0.3)(jsonwebtoken@9.0.2)(lodash@4.17.21)(openai@5.12.2(ws@8.18.0)(zod@4.1.5))(pdf-parse@1.1.1)(pg@8.16.3)(playwright@1.55.0)(redis@5.8.1)(weaviate-client@3.8.1(encoding@0.1.13))(ws@8.18.0)':
+  '@langchain/community@0.3.54(@browserbasehq/sdk@2.6.0(encoding@0.1.13))(@browserbasehq/stagehand@1.14.0(@playwright/test@1.55.0)(deepmerge@4.3.1)(dotenv@16.6.1)(encoding@0.1.13)(openai@5.12.2(ws@8.18.0)(zod@4.1.5))(zod@4.1.5))(@ibm-cloud/watsonx-ai@1.6.12)(@langchain/core@0.3.73(openai@5.12.2(ws@8.18.0)(zod@4.1.5)))(@langchain/ollama@0.2.4(@langchain/core@0.3.73(openai@5.12.2(ws@8.18.0)(zod@4.1.5))))(axios@1.11.0)(chromadb@3.0.14)(encoding@0.1.13)(handlebars@4.7.8)(ibm-cloud-sdk-core@5.4.2)(ignore@5.3.2)(ioredis@5.7.0)(jsdom@20.0.3)(jsonwebtoken@9.0.2)(lodash@4.17.21)(openai@5.12.2(ws@8.18.0)(zod@4.1.5))(pdf-parse@1.1.1)(pg@8.16.3)(playwright@1.55.0)(redis@5.8.1)(weaviate-client@3.8.1(encoding@0.1.13))(ws@8.18.0)':
     dependencies:
       '@browserbasehq/stagehand': 1.14.0(@playwright/test@1.55.0)(deepmerge@4.3.1)(dotenv@16.6.1)(encoding@0.1.13)(openai@5.12.2(ws@8.18.0)(zod@4.1.5))(zod@4.1.5)
       '@ibm-cloud/watsonx-ai': 1.6.12
@@ -11192,6 +11232,7 @@ snapshots:
       zod: 3.25.76
     optionalDependencies:
       '@browserbasehq/sdk': 2.6.0(encoding@0.1.13)
+      chromadb: 3.0.14
       ignore: 5.3.2
       ioredis: 5.7.0
       jsdom: 20.0.3
@@ -14190,6 +14231,31 @@ snapshots:
   chokidar@4.0.3:
     dependencies:
       readdirp: 4.1.2
+
+  chromadb-js-bindings-darwin-arm64@1.0.5:
+    optional: true
+
+  chromadb-js-bindings-darwin-x64@1.0.5:
+    optional: true
+
+  chromadb-js-bindings-linux-arm64-gnu@1.0.5:
+    optional: true
+
+  chromadb-js-bindings-linux-x64-gnu@1.0.5:
+    optional: true
+
+  chromadb-js-bindings-win32-x64-msvc@1.0.5:
+    optional: true
+
+  chromadb@3.0.14:
+    dependencies:
+      semver: 7.7.2
+    optionalDependencies:
+      chromadb-js-bindings-darwin-arm64: 1.0.5
+      chromadb-js-bindings-darwin-x64: 1.0.5
+      chromadb-js-bindings-linux-arm64-gnu: 1.0.5
+      chromadb-js-bindings-linux-x64-gnu: 1.0.5
+      chromadb-js-bindings-win32-x64-msvc: 1.0.5
 
   chrome-trace-event@1.0.4: {}
 

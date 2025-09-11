@@ -57,6 +57,22 @@ services:
         reservations:
           memory: 256M
 
+  # Chroma 向量数据库服务
+  chromadb:
+    image: chromadb/chroma:0.6.3
+    container_name: stock-chromadb-dev
+    ports:
+      - '8000:8000'
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/chroma/chroma
+      - ANONYMIZED_TELEMETRY=TRUE
+    volumes:
+      - chroma-data:/chroma/chroma
+    networks:
+      - app-network
+
+
   # 后端开发服务
   stock-back-end-dev:
     build:
@@ -83,6 +99,9 @@ services:
       - REDIS_PORT=6379
       # 优化Node.js性能
       - NODE_OPTIONS=--max-old-space-size=512
+      # Chroma 连接地址
+      - CHROMA_URL=http://chromadb:8000
+      - CHROMA_COLLECTION=resume_brooot
     volumes:
       # 挂载源代码目录以确保热重载正常工作
       - ./apps/stock-back-end:/app/apps/stock-back-end:cached
@@ -106,6 +125,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      chromadb:
+        condition: service_started
     # 添加健康检查
     healthcheck:
       test: ['CMD-SHELL', 'curl -f http://localhost:3001/api || exit 1']
@@ -143,4 +164,6 @@ volumes:
   dist_cache:
     driver: local
   pnpm_cache:
+    driver: local
+  chroma-data:
     driver: local

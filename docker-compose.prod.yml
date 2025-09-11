@@ -49,6 +49,20 @@ services:
       timeout: 5s
       retries: 5
 
+  # Chroma 向量数据库服务
+  chromadb:
+    image: chromadb/chroma:0.6.3
+    container_name: stock-chromadb
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/chroma/chroma
+      - ANONYMIZED_TELEMETRY=TRUE
+    volumes:
+      - chroma-data:/chroma/chroma
+    networks:
+      - stock-network
+    restart: unless-stopped
+
   # 后端服务
   stock-back-end:
     image: ${DOCKER_REGISTRY}/${DOCKER_NAMESPACE}/${DOCKER_REPO_NAME}:backend-latest
@@ -80,6 +94,9 @@ services:
       - REDIS_PASSWORD=${REDIS_PASSWORD:-}
       - NODE_OPTIONS=--max-old-space-size=512
       - ENABLE_HTTPS=false
+      # Chroma 配置
+      - CHROMA_URL=${CHROMA_URL:-http://chromadb:8000}
+      - CHROMA_COLLECTION=${CHROMA_COLLECTION:-resume_brooot}
     # 不直接暴露端口，通过nginx代理
     expose:
       - '3001'
@@ -88,6 +105,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      chromadb:
+        condition: service_started
     networks:
       - stock-network
 
@@ -153,4 +172,6 @@ volumes:
   postgres-data:
     driver: local
   redis-data:
+    driver: local
+  chroma-data:
     driver: local
