@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { EventEmitter } from 'events';
 import { OrderService } from '../order/order.service';
 import { ChatOpenAI } from '@langchain/openai';
@@ -14,6 +14,15 @@ import { createGetStockPrice } from './tools/price-check';
 import { TradeService } from '../trade/trade.service';
 import { UserService } from '../user/user.service';
 import { createGetOrderInfo } from './tools/order-tools';
+import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
+import { MemoryVectorStore } from 'langchain/vectorstores/memory';
+import { CheerioWebBaseLoader } from '@langchain/community/document_loaders/web/cheerio';
+// import { ChatAlibabaTongyi } from '@langchain/community/chat_models/alibaba_tongyi';
+import { AlibabaTongyiEmbeddings } from '@langchain/community/embeddings/alibaba_tongyi';
+import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
+import path from 'path';
+import { existsSync } from 'fs';
+import { createRetrieverTool } from 'langchain/tools/retriever';
 
 export interface ChatRequest {
   userId: number;
@@ -23,30 +32,39 @@ export interface ChatRequest {
 }
 
 @Injectable()
-export class AiService {
+export class AiService implements OnModuleInit {
   private llm: ChatOpenAI;
   private agent: ReturnType<typeof createReactAgent>;
   private tools: ReturnType<typeof tool>[];
 
-  constructor(
-    private readonly orderService: OrderService,
-    private readonly tradeService: TradeService,
-    private readonly userService: UserService
-  ) {
-    this.llm = new ChatOpenAI({
-      apiKey: this.getApiKey(),
-      configuration: {
-        baseURL: process.env.DEEPSEEK_API_BASE || 'https://api.deepseek.com/v1',
-      },
-      model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
-      streaming: true,
-      maxTokens: MAX_TOKENS,
+  async onModuleInit() {
+    const pdfPath = path.resolve(
+      process.cwd(),
+      'apps/stock-back-end/src/app/ai/assets/brooot_profile.pdf'
+    );
+    const loader = new PDFLoader(pdfPath);
+    const docs = await loader.load();
+    const textSplitter = new RecursiveCharacterTextSplitter({
+      chunkSize: 500,
+      chunkOverlap: 50,
+    });
+    const docSplits = await textSplitter.splitDocuments(docs);
+
+    // Add to vectorDB
+    const vectorStore = await MemoryVectorStore.fromDocuments(
+      docSplits,
+      new AlibabaTongyiEmbeddings({
+        modelName: 'text-embedding-v4',
+      })
+    );
+
+    const retriever = vectorStore.asRetriever();
+    const retrievalTool = createRetrieverTool(retriever, {
+      name: 'retrieve_resume_info',
+      description: '用于检索并返回当前交易系统的开发者的简历信息',
     });
 
-    this.tools = [
-      createGetStockPrice(this.tradeService),
-      createGetOrderInfo(this.orderService),
-    ];
+    this.tools.push(retrievalTool);
 
     const prompt = (
       state: typeof CustomGraphState.State
@@ -70,16 +88,36 @@ export class AiService {
     });
   }
 
-  private getApiKey(): string {
-    const key = process.env.DEEPSEEK_API_KEY;
-    if (!key) throw new Error('Missing DEEPSEEK_API_KEY');
-    return key;
+  constructor(
+    private readonly orderService: OrderService,
+    private readonly tradeService: TradeService,
+    private readonly userService: UserService
+  ) {
+    this.llm = new ChatOpenAI({
+      apiKey: process.env.DEEPSEEK_API_KEY,
+      configuration: {
+        baseURL: process.env.DEEPSEEK_API_BASE || 'https://api.deepseek.com/v1',
+      },
+      model: process.env.DEEPSEEK_MODEL || 'deepseek-chat',
+      streaming: true,
+      maxTokens: MAX_TOKENS,
+    });
+
+    this.tools = [
+      createGetStockPrice(this.tradeService),
+      createGetOrderInfo(this.orderService),
+    ];
   }
+
+  // private getApiKey(): string {
+  //   const key = process.env.DEEPSEEK_API_KEY;
+  //   // const key = process.env.ALIBABA_API_KEY;
+  //   if (!key) throw new Error('Missing _API_KEY');
+  //   return key;
+  // }
 
   async handleStreamOutput(stream: any, emitter: EventEmitter) {
     let hasContent = false;
-    // eslint-disable-next-line
-    // @ts-ignore
     for await (const [streamMode, chunk] of stream) {
       if (streamMode === 'messages') {
         const [message, _metadata] = chunk;
@@ -98,10 +136,8 @@ export class AiService {
           );
         }
       } else if (streamMode === 'updates') {
-        console.log('===> current values: ', chunk);
         if (chunk?.__interrupt__?.length) {
-          console.log('===> values interrupt: ', chunk?.__interrupt__);
-          // hasContent = true;
+          hasContent = true;
           emitter.emit(
             'message',
             JSON.stringify({
@@ -110,15 +146,6 @@ export class AiService {
             })
           );
         }
-      }
-      if (!hasContent) {
-        // emitter.emit(
-        //   'message',
-        //   JSON.stringify({
-        //     type: 'error',
-        //     error: '系统繁忙，请稍后再试。',
-        //   })
-        // );
       }
     }
     if (hasContent) {
@@ -138,7 +165,8 @@ export class AiService {
         } else {
           const userName = await this.userService.getUserName(req.userId);
           inputs = {
-            messages: [new HumanMessage(req.message)],
+            // messages: [new HumanMessage(req.message)],
+            messages: [{ role: 'user', content: req.message }],
             // 提供信息给系统提示词消费
             userName,
             userId: req.userId,
@@ -153,18 +181,6 @@ export class AiService {
         });
 
         await this.handleStreamOutput(stream, emitter);
-
-        // const secondStream = await this.agent.stream(
-        //   new Command({ resume: { approved: true } }),
-        //   {
-        //     streamMode: ['messages', 'values'],
-        //     configurable: {
-        //       userId: req.userId,
-        //       thread_id: req.sessionId,
-        //     },
-        //   }
-        // );
-        // await this.handleStreamOutput(secondStream, emitter);
       } catch (e: any) {
         console.log('===> 出错: ', e);
         emitter.emit(

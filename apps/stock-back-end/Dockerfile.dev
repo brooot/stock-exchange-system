@@ -45,6 +45,10 @@ RUN ls -la node_modules/.prisma/client/ || echo "Prisma client not found"
 # 创建必要的目录
 RUN mkdir -p apps/stock-back-end/src dist/apps/stock-back-end
 
+# 将 AI 资产拷贝到镜像固定路径，确保与运行时代码路径一致
+RUN mkdir -p apps/stock-back-end/src/app/ai/assets
+COPY apps/stock-back-end/src/app/ai/assets/brooot_profile.pdf apps/stock-back-end/src/app/ai/assets/
+
 # 复制启动脚本
 COPY apps/stock-back-end/start-dev.sh /app/start-dev.sh
 RUN chmod +x /app/start-dev.sh
@@ -52,7 +56,6 @@ RUN chmod +x /app/start-dev.sh
 # 暴露端口
 EXPOSE 3001 9229
 
-# 健康检查
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD curl -f http://localhost:3001/api || exit 1
 

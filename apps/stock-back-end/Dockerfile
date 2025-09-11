@@ -33,6 +33,10 @@ COPY dist/apps/stock-back-end/ ./
 # 复制 Prisma schema
 COPY prisma ./prisma
 
+# 同步复制 AI 资产到运行时代码使用的固定路径，保证与开发一致
+RUN mkdir -p /app/apps/stock-back-end/src/app/ai/assets
+COPY apps/stock-back-end/src/app/ai/assets/brooot_profile.pdf /app/apps/stock-back-end/src/app/ai/assets/
+
 # 生成 Prisma 客户端
 RUN pnpm prisma generate
 
