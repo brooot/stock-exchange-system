@@ -27,45 +27,7 @@ module.exports = {
       additionalModuleDirs: ['../../node_modules'],
       modulesFromFile: false,
       importType: 'commonjs',
-      allowlist: [
-        // 打包核心 NestJS 模块，但排除微服务相关
-        /^@nestjs\/common/,
-        /^@nestjs\/core/,
-        /^@nestjs\/platform-express/,
-        /^@nestjs\/platform-socket\.io/,
-        /^@nestjs\/websockets/,
-        /^@nestjs\/swagger/,
-        /^@nestjs\/config/,
-        /^@nestjs\/jwt/,
-        /^@nestjs\/passport/,
-        /^@nestjs\/throttler/,
-        /^@nestjs\/serve-static/,
-        /^@nestjs\/schedule/,
-        /^@nestjs\/event-emitter/,
-        /^@nestjs\/cache-manager/,
-        /^@nestjs\/bull/,
-        /^@nestjs\/testing/,
-        // Passport 相关模块
-        /^passport/,
-        /^passport-jwt/,
-        /^passport-local/,
-        /^passport-strategy/,
-        // Prisma 相关模块 - 注意：@prisma/client 需要外部化
-        /^@prisma\/engines/,
-        /^class-validator/,
-        /^class-transformer/,
-        /^reflect-metadata/,
-        /^rxjs/,
-        /^tslib/,
-        // Express 相关模块
-        /^express/,
-        /^cookie-parser/,
-        // Socket.io 相关模块
-        /^socket\.io/,
-        // 其他核心依赖
-        /^axios/,
-        /^decimal\.js/
-      ]
+      allowlist: [],
     }),
     // 明确外部化数据库、微服务和原生模块
     {
